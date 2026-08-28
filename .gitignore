@@ -46,7 +46,3 @@ build/
 # Local database (dev)
 *.sqlite
 *.sqlite-journal
-
-# Windows
-desktop.ini
-Thumbs.db

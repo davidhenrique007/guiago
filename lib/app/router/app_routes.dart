@@ -3,6 +3,15 @@ part of 'app_router.dart';
 /// Centralized route paths and names. Every feature adds its routes
 /// here instead of hardcoding path strings at call sites.
 abstract final class AppRoutes {
-  static const String home = '/';
+  static const String splash = '/';
+  static const String splashName = 'splash';
+
+  static const String welcome = '/welcome';
+  static const String welcomeName = 'welcome';
+
+  static const String onboarding = '/onboarding';
+  static const String onboardingName = 'onboarding';
+
+  static const String home = '/home';
   static const String homeName = 'home';
 }

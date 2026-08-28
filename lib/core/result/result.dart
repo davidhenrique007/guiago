@@ -33,32 +33,13 @@ sealed class Result<T> {
   }) =>
       switch (this) {
         Success<T>(:final value) => success(value),
-        Fail<T>(failure: final f) => failure(f), // <- linha corrigida
+        Fail<T>(failure: final f) => failure(f),
       };
 
   /// Transforms the success value, leaving a [Fail] untouched.
   Result<R> map<R>(R Function(T value) transform) => switch (this) {
         Success<T>(:final value) => Success<R>(transform(value)),
         Fail<T>(:final failure) => Fail<R>(failure),
-      };
-
-  /// Transforms the failure, leaving a [Success] untouched.
-  Result<T> mapFailure(Result<T> Function(Failure failure) transform) =>
-      switch (this) {
-        Success<T>() => this,
-        Fail<T>(:final failure) => transform(failure),
-      };
-
-  /// Executes [action] if this is a [Success].
-  void forEach(void Function(T value) action) => switch (this) {
-        Success<T>(:final value) => action(value),
-        Fail<T>() => null,
-      };
-
-  /// Returns the success value or a default value.
-  T getOrElse(T Function(Failure failure) orElse) => switch (this) {
-        Success<T>(:final value) => value,
-        Fail<T>(:final failure) => orElse(failure),
       };
 }
 
@@ -67,19 +48,6 @@ final class Success<T> extends Result<T> {
   const Success(this.value);
 
   final T value;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Success<T> &&
-          runtimeType == other.runtimeType &&
-          value == other.value;
-
-  @override
-  int get hashCode => value.hashCode;
-
-  @override
-  String toString() => 'Success($value)';
 }
 
 /// A failed [Result] carrying a [Failure].
@@ -90,17 +58,4 @@ final class Fail<T> extends Result<T> {
   const Fail(this.failure);
 
   final Failure failure;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Fail<T> &&
-          runtimeType == other.runtimeType &&
-          failure == other.failure;
-
-  @override
-  int get hashCode => failure.hashCode;
-
-  @override
-  String toString() => 'Fail($failure)';
 }

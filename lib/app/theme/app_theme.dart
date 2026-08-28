@@ -22,8 +22,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
-      fontFamily: AppTypography.fontFamily,
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         displayLarge: AppTypography.displayLarge,
         titleLarge: AppTypography.titleLarge,
         titleMedium: AppTypography.titleMedium,

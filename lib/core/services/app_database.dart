@@ -8,13 +8,6 @@ import 'package:path_provider/path_provider.dart';
 part 'app_database.g.dart';
 
 /// Metadata table — schema version bookkeeping only.
-///
-/// This is the ONLY table created in Fase 0. Domain tables (`tasks`,
-/// `task_occurrences`, `task_events`, `performance_records`, `scores`,
-/// `levels`, `settings`, `alarm_records` — see master spec §15) are
-/// intentionally deferred to the phases that own that domain
-/// (Fase 2 Task Engine, Fase 5 Performance, etc.), so this file
-/// doesn't get ahead of the phase that's actually allowed to run.
 class AppMetadataTable extends Table {
   @override
   String get tableName => 'app_metadata';
@@ -26,7 +19,159 @@ class AppMetadataTable extends Table {
   Set<Column<Object>> get primaryKey => {schemaVersion};
 }
 
-@DriftDatabase(tables: [AppMetadataTable])
+/// User profile + preferences captured during onboarding (Fase 1).
+/// Single-row table — always keyed by `id = 0`.
+///
+/// `@DataClassName('SettingsRow')` avoids a name collision with the
+/// Domain `Settings` entity (`features/onboarding/domain/settings.dart`)
+/// — this row is a persistence detail, mapped to/from `Settings` in
+/// the repository, and never leaks past the Data layer.
+@DataClassName('SettingsRow')
+class SettingsTable extends Table {
+  @override
+  String get tableName => 'settings';
+
+  IntColumn get id => integer().withDefault(const Constant(0))();
+  TextColumn get userName => text().withDefault(const Constant(''))();
+  TextColumn get mainObjective => text().withDefault(const Constant(''))();
+  IntColumn get dayStartMinutes =>
+      integer().withDefault(const Constant(7 * 60))();
+  IntColumn get dayEndMinutes =>
+      integer().withDefault(const Constant(22 * 60))();
+  BoolColumn get notificationsEnabled =>
+      boolean().withDefault(const Constant(true))();
+  BoolColumn get ttsEnabled => boolean().withDefault(const Constant(true))();
+  IntColumn get defaultSnoozeMinutes =>
+      integer().withDefault(const Constant(10))();
+  IntColumn get defaultToleranceMinutes =>
+      integer().withDefault(const Constant(15))();
+  BoolColumn get onboardingCompleted =>
+      boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// A task's persisted row (Fase 2, master spec §10, §15).
+/// `@DataClassName('TaskRow')` keeps this a Data-layer detail,
+/// separate from the Domain `Task` entity.
+@DataClassName('TaskRow')
+class TasksTable extends Table {
+  @override
+  String get tableName => 'tasks';
+
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get priority => text()();
+
+  /// One of: none, daily, weekly, customDays.
+  TextColumn get recurrenceType => text()();
+
+  /// Comma-separated `DateTime.weekday` ints (1=Mon..7=Sun).
+  /// Only meaningful when [recurrenceType] is `customDays`.
+  TextColumn get recurrenceWeekdays => text().nullable()();
+
+  IntColumn get defaultToleranceMinutes => integer()();
+  IntColumn get defaultSnoozeMinutes => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// A single scheduled instance of a task (Fase 2, master spec §10).
+/// `@DataClassName('TaskOccurrenceRow')` keeps this a Data-layer
+/// detail, separate from the Domain `TaskOccurrence` entity.
+@DataClassName('TaskOccurrenceRow')
+@TableIndex(name: 'idx_occurrences_task_id', columns: {#taskId})
+class TaskOccurrencesTable extends Table {
+  @override
+  String get tableName => 'task_occurrences';
+
+  TextColumn get id => text()();
+  TextColumn get taskId => text().references(TasksTable, #id)();
+  DateTimeColumn get scheduledAt => dateTime()();
+  DateTimeColumn get triggeredAt => dateTime().nullable()();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// One of: scheduled, triggered, snoozed, completed, declined,
+  /// missed, cancelled.
+  TextColumn get status => text()();
+
+  IntColumn get snoozeCount => integer().withDefault(const Constant(0))();
+  IntColumn get responseTimeSeconds => integer().nullable()();
+  IntColumn get toleranceMinutes => integer()();
+  TextColumn get declineReason => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// An append-only occurrence status-transition log entry (Fase 2,
+/// master spec §10 — "the system must preserve history").
+/// `@DataClassName('TaskEventRow')` keeps this a Data-layer detail,
+/// separate from the Domain `TaskEvent` entity.
+@DataClassName('TaskEventRow')
+@TableIndex(name: 'idx_events_occurrence_id', columns: {#occurrenceId})
+class TaskEventsTable extends Table {
+  @override
+  String get tableName => 'task_events';
+
+  TextColumn get id => text()();
+  TextColumn get taskId => text().references(TasksTable, #id)();
+  TextColumn get occurrenceId => text().references(TaskOccurrencesTable, #id)();
+  TextColumn get fromStatus => text()();
+  TextColumn get toStatus => text()();
+  DateTimeColumn get occurredAt => dateTime()();
+  TextColumn get note => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// The link between one [TaskOccurrencesTable] row and the native OS
+/// alarm scheduled for it (Fase 3, master spec §10, §13).
+/// `@DataClassName('AlarmRecordRow')` keeps this a Data-layer detail,
+/// separate from the Domain `AlarmRecord` entity.
+///
+/// Every reschedule (snooze, edit, recovery) inserts a *new* row
+/// rather than mutating the old one — the previous row is kept with
+/// `status = cancelled` for history, matching the same
+/// preserve-history principle already used by [TaskEventsTable].
+@DataClassName('AlarmRecordRow')
+@TableIndex(name: 'idx_alarm_records_occurrence_id', columns: {#occurrenceId})
+class AlarmRecordsTable extends Table {
+  @override
+  String get tableName => 'alarm_records';
+
+  TextColumn get id => text()();
+  TextColumn get occurrenceId =>
+      text().references(TaskOccurrencesTable, #id)();
+  TextColumn get taskId => text().references(TasksTable, #id)();
+  IntColumn get nativeAlarmId => integer()();
+  DateTimeColumn get scheduledAt => dateTime()();
+
+  /// One of: scheduled, fired, cancelled.
+  TextColumn get status => text()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [
+    AppMetadataTable,
+    SettingsTable,
+    TasksTable,
+    TaskOccurrencesTable,
+    TaskEventsTable,
+    AlarmRecordsTable,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -35,12 +180,25 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(settingsTable);
+          }
+          if (from < 3) {
+            await m.createTable(tasksTable);
+            await m.createTable(taskOccurrencesTable);
+            await m.createTable(taskEventsTable);
+          }
+          if (from < 4) {
+            await m.createTable(alarmRecordsTable);
+          }
         },
       );
 }
