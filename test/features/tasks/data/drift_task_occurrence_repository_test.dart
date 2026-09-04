@@ -101,5 +101,31 @@ void main() {
         expect(result.valueOrNull, isNull);
       },
     );
+
+    test(
+      'getAllActiveOccurrences returns live occurrences across every task, oldest first',
+      () async {
+        await repository.saveOccurrence(
+          buildOccurrence(
+            id: 'occ-later',
+            scheduledAt: DateTime(2026, 8, 25, 9, 0),
+          ),
+        );
+        await repository.saveOccurrence(
+          buildOccurrence(
+            id: 'occ-earlier',
+            scheduledAt: DateTime(2026, 8, 24, 9, 0),
+          ),
+        );
+        await repository.saveOccurrence(
+          buildOccurrence(id: 'occ-done', status: OccurrenceStatus.completed),
+        );
+
+        final result = await repository.getAllActiveOccurrences();
+
+        final ids = result.valueOrNull!.map((o) => o.id).toList();
+        expect(ids, <String>['occ-earlier', 'occ-later']);
+      },
+    );
   });
 }

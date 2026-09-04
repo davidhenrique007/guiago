@@ -2,7 +2,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/errors/failures.dart';
 import '../../../core/result/result.dart';
-import '../../scheduler/application/scheduler_engine.dart';
+import '../domain/alarm_scheduler.dart';
 import '../domain/occurrence_state_machine.dart';
 import '../domain/occurrence_status.dart';
 import '../domain/recurrence_engine.dart';
@@ -15,47 +15,39 @@ import '../domain/task_occurrence_repository.dart';
 import '../domain/task_priority.dart';
 import '../domain/task_repository.dart';
 
-/// The Task Engine (master spec §17): createTask, updateTask,
-/// archiveTask, deleteTask, completeOccurrence, declineOccurrence,
-/// snoozeOccurrence. This is the ONLY place allowed to change an
-/// occurrence's status — always through [OccurrenceStateMachine] —
-/// and the only place that decides when the Recurrence Engine should
-/// generate the next occurrence.
+/// The Task Engine (master spec §17). This is the ONLY place allowed
+/// to change an occurrence's status — always through
+/// [OccurrenceStateMachine] — and the only place that decides when
+/// the Recurrence Engine should generate the next occurrence.
 ///
-/// Fase 3: also the only place that tells [SchedulerEngine] when an
-/// occurrence's native alarm needs to be scheduled or cancelled —
-/// [SchedulerEngine] itself never knows *why* a schedule/cancel
-/// happened, only that it was asked to.
-///
-/// Alarm scheduling is deliberately best-effort here: its [Result]
-/// is awaited but never propagated as a failure of the primary
-/// operation, mirroring how `_recordEvent`'s result already isn't
-/// checked. A denied notification permission (`PermissionFailure`)
-/// must never block task creation or resolution — the offline-first
-/// core (§2, §25) does not depend on it.
+/// [alarmScheduler] is optional: when null (as in every Fase 2 test),
+/// the engine works exactly as it did before Fase 3 — no scheduling
+/// side effects. When provided, occurrence creation/resolution/snooze
+/// also keeps native alarms in sync (best-effort — a scheduling
+/// failure never fails the underlying task/occurrence operation; see
+/// ADR-006).
 class TaskEngine {
   TaskEngine({
     required TaskRepository taskRepository,
     required TaskOccurrenceRepository occurrenceRepository,
     required TaskEventRepository eventRepository,
-    required SchedulerEngine schedulerEngine,
+    AlarmScheduler? alarmScheduler,
     Uuid? uuid,
   })  : _tasks = taskRepository,
         _occurrences = occurrenceRepository,
         _events = eventRepository,
-        _scheduler = schedulerEngine,
+        _alarmScheduler = alarmScheduler,
         _uuid = uuid ?? const Uuid();
 
   final TaskRepository _tasks;
   final TaskOccurrenceRepository _occurrences;
   final TaskEventRepository _events;
-  final SchedulerEngine _scheduler;
+  final AlarmScheduler? _alarmScheduler;
   final Uuid _uuid;
 
-  /// Creates a task and its first occurrence at [scheduledAt], then
-  /// schedules its native alarm. Further occurrences are generated
-  /// one at a time as each prior one resolves (§12) — never
-  /// generated up front.
+  /// Creates a task and its first occurrence at [scheduledAt].
+  /// Further occurrences are generated one at a time as each prior
+  /// one resolves (§12) — never generated up front.
   Future<Result<Task>> createTask({
     required String title,
     String? description,
@@ -103,7 +95,7 @@ class TaskEngine {
       return Fail<Task>(failure);
     }
 
-    await _scheduler.scheduleForOccurrence(occurrence);
+    await _alarmScheduler?.scheduleOccurrence(occurrence);
 
     return Success<Task>(task);
   }
@@ -113,19 +105,9 @@ class TaskEngine {
     return _tasks.saveTask(updated);
   }
 
-  /// Archives the task and cancels its current live occurrence's
-  /// native alarm, if any.
-  Future<Result<void>> archiveTask(String taskId) async {
-    await _cancelActiveAlarmForTask(taskId);
-    return _tasks.archiveTask(taskId);
-  }
+  Future<Result<void>> archiveTask(String taskId) => _tasks.archiveTask(taskId);
 
-  /// Deletes the task and cancels its current live occurrence's
-  /// native alarm, if any.
-  Future<Result<void>> deleteTask(String taskId) async {
-    await _cancelActiveAlarmForTask(taskId);
-    return _tasks.deleteTask(taskId);
-  }
+  Future<Result<void>> deleteTask(String taskId) => _tasks.deleteTask(taskId);
 
   /// Marks the occurrence completed and, if the task recurs,
   /// generates and schedules the next occurrence.
@@ -144,8 +126,7 @@ class TaskEngine {
   }
 
   /// Marks the occurrence declined (optionally with a reason) and,
-  /// if the task recurs, generates and schedules the next
-  /// occurrence.
+  /// if the task recurs, generates and schedules the next occurrence.
   Future<Result<TaskOccurrence>> declineOccurrence(
     String occurrenceId, {
     String? reason,
@@ -157,18 +138,17 @@ class TaskEngine {
     );
   }
 
-  /// Marks the occurrence missed (tolerance window elapsed with no
-  /// response) and, if the task recurs, generates and schedules the
-  /// next occurrence.
+  /// Marks the occurrence missed and, if the task recurs, generates
+  /// and schedules the next occurrence.
   Future<Result<TaskOccurrence>> markMissed(String occurrenceId) {
     return _resolveOccurrence(occurrenceId, OccurrenceStatus.missed);
   }
 
   /// Snoozes the occurrence: increments `snoozeCount`, pushes
-  /// `scheduledAt` forward by [snoozeMinutes], and reschedules its
-  /// native alarm to match. Per §11, SNOOZED must return to
-  /// SCHEDULED — it never resolves the occurrence, so no next
-  /// occurrence is generated here.
+  /// `scheduledAt` forward by [snoozeMinutes], and re-arms the alarm
+  /// for the new time. Per §11, SNOOZED must return to SCHEDULED — it
+  /// never resolves the occurrence, so no next occurrence is
+  /// generated here.
   Future<Result<TaskOccurrence>> snoozeOccurrence(
     String occurrenceId, {
     int snoozeMinutes = 10,
@@ -219,10 +199,8 @@ class TaskEngine {
       OccurrenceStatus.scheduled,
     );
 
-    // scheduleForOccurrence() cancels any existing live alarm for
-    // this occurrence id before arming the new one, so this alone
-    // is the full "cancel old / schedule new" reschedule.
-    await _scheduler.scheduleForOccurrence(rescheduled);
+    await _alarmScheduler?.cancelOccurrence(occurrenceId);
+    await _alarmScheduler?.scheduleOccurrence(rescheduled);
 
     return Success<TaskOccurrence>(rescheduled);
   }
@@ -267,26 +245,31 @@ class TaskEngine {
     }
 
     await _recordEvent(current, toStatus);
-    await _scheduler.cancelForOccurrence(resolved.id);
-    await _generateNextOccurrenceIfRecurring(resolved);
+    await _alarmScheduler?.cancelOccurrence(occurrenceId);
+
+    final TaskOccurrence? next =
+        await _generateNextOccurrenceIfRecurring(resolved);
+    if (next != null) {
+      await _alarmScheduler?.scheduleOccurrence(next);
+    }
 
     return Success<TaskOccurrence>(resolved);
   }
 
-  Future<void> _generateNextOccurrenceIfRecurring(
+  Future<TaskOccurrence?> _generateNextOccurrenceIfRecurring(
     TaskOccurrence resolvedOccurrence,
   ) async {
     final Result<Task?> taskResult =
         await _tasks.getTask(resolvedOccurrence.taskId);
     final Task? task = taskResult.valueOrNull;
-    if (task == null || task.isArchived) return;
+    if (task == null || task.isArchived) return null;
 
     final DateTime? next = RecurrenceEngine.nextOccurrenceAfter(
       recurrenceRule: task.recurrenceRule,
       anchor: resolvedOccurrence.scheduledAt,
       after: resolvedOccurrence.scheduledAt,
     );
-    if (next == null) return;
+    if (next == null) return null;
 
     final TaskOccurrence nextOccurrence = TaskOccurrence(
       id: _uuid.v4(),
@@ -298,18 +281,7 @@ class TaskEngine {
     );
     final Result<TaskOccurrence> saveResult =
         await _occurrences.saveOccurrence(nextOccurrence);
-    if (saveResult.isSuccess) {
-      await _scheduler.scheduleForOccurrence(nextOccurrence);
-    }
-  }
-
-  Future<void> _cancelActiveAlarmForTask(String taskId) async {
-    final Result<TaskOccurrence?> activeResult =
-        await _occurrences.getActiveOccurrenceForTask(taskId);
-    final TaskOccurrence? active = activeResult.valueOrNull;
-    if (active != null) {
-      await _scheduler.cancelForOccurrence(active.id);
-    }
+    return saveResult.valueOrNull;
   }
 
   Future<void> _recordEvent(

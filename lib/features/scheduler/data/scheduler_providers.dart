@@ -1,50 +1,44 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_database.dart';
 import '../../../core/services/database_provider.dart';
+import '../../tasks/application/task_engine.dart';
 import '../../tasks/data/task_providers.dart';
 import '../application/scheduler_engine.dart';
-import '../domain/alarm_record_repository.dart';
-import '../domain/alarm_scheduler.dart';
-import '../domain/permission_service.dart';
-import '../infrastructure/notification_alarm_scheduler.dart';
-import '../infrastructure/permission_handler_service.dart';
-import 'drift_alarm_record_repository.dart';
+import '../domain/alarm_repository.dart';
+import '../infrastructure/notification_service.dart';
+import 'drift_alarm_repository.dart';
 
-/// Single shared plugin instance for the app's lifetime — mirrors
-/// `appDatabaseProvider`'s pattern in `core/services`.
-final Provider<FlutterLocalNotificationsPlugin>
-    flutterLocalNotificationsPluginProvider =
-    Provider<FlutterLocalNotificationsPlugin>((ref) {
-  return FlutterLocalNotificationsPlugin();
-});
+final Provider<NotificationService> notificationServiceProvider =
+    Provider<NotificationService>((ref) => NotificationService());
 
-final Provider<AlarmRecordRepository> alarmRecordRepositoryProvider =
-    Provider<AlarmRecordRepository>((ref) {
+final Provider<AlarmRepository> alarmRepositoryProvider =
+    Provider<AlarmRepository>((ref) {
   final AppDatabase db = ref.watch(appDatabaseProvider);
-  return DriftAlarmRecordRepository(db);
-});
-
-final Provider<AlarmScheduler> alarmSchedulerProvider =
-    Provider<AlarmScheduler>((ref) {
-  final FlutterLocalNotificationsPlugin plugin =
-      ref.watch(flutterLocalNotificationsPluginProvider);
-  return NotificationAlarmScheduler(plugin);
-});
-
-final Provider<PermissionService> permissionServiceProvider =
-    Provider<PermissionService>((ref) {
-  return PermissionHandlerService();
+  return DriftAlarmRepository(db);
 });
 
 final Provider<SchedulerEngine> schedulerEngineProvider =
     Provider<SchedulerEngine>((ref) {
   return SchedulerEngine(
-    alarmRepository: ref.watch(alarmRecordRepositoryProvider),
+    notificationService: ref.watch(notificationServiceProvider),
+    alarmRepository: ref.watch(alarmRepositoryProvider),
     occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
     taskRepository: ref.watch(taskRepositoryProvider),
-    alarmScheduler: ref.watch(alarmSchedulerProvider),
-    permissionService: ref.watch(permissionServiceProvider),
+  );
+});
+
+/// A [TaskEngine] with alarm scheduling wired in. Prefer this over
+/// the plain `taskEngineProvider` (from `tasks/data/task_providers.dart`)
+/// once alarms matter — that one stays scheduler-free on purpose, so
+/// the tasks feature never has to import the scheduler feature (see
+/// ADR-006).
+final Provider<TaskEngine> taskEngineWithSchedulerProvider =
+    Provider<TaskEngine>((ref) {
+  return TaskEngine(
+    taskRepository: ref.watch(taskRepositoryProvider),
+    occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
+    eventRepository: ref.watch(taskEventRepositoryProvider),
+    alarmScheduler: ref.watch(schedulerEngineProvider),
   );
 });

@@ -1,3 +1,4 @@
+```markdown
 # Changelog
 
 ## [Unreleased] — Fase 0: Foundation + Architecture
@@ -81,3 +82,38 @@
   rejection — including the case of completing a still-SCHEDULED
   occurrence, since only TRIGGERED can resolve).
 - No UI in this phase — see ARCHITECTURE.md for why.
+
+## [Unreleased] — Fase 3: Scheduler + Alarm System
+
+### Added
+- Domain: `AlarmRecord`, `AlarmRepository`, `AlarmIdGenerator`,
+  `AlarmNotifier` (in `features/scheduler`); `AlarmScheduler` (in
+  `features/tasks/domain`, implemented by `SchedulerEngine` — see
+  ADR-006 for why it lives there).
+- `NotificationService` — wraps `flutter_local_notifications`,
+  handles the Android notification channel, `permission_handler`
+  requests, and timezone-aware scheduling via `flutter_timezone` +
+  `timezone` (see ADR-007).
+- `SchedulerEngine` (§13): `scheduleOccurrence`, `cancelOccurrence`,
+  `reschedule`, `rescheduleAll`.
+- `DriftAlarmRepository` + Riverpod providers
+  (`scheduler_providers.dart`), including
+  `taskEngineWithSchedulerProvider`.
+- `TaskEngine` now accepts an optional `AlarmScheduler?` and keeps
+  native alarms in sync with occurrence creation, resolution, and
+  snooze — best-effort, never blocking the underlying operation on a
+  scheduling failure.
+- `TaskOccurrenceRepository.getAllActiveOccurrences()` — new method,
+  the foundation for `rescheduleAll()` and Fase 7's boot recovery.
+- Database: `alarm_records` table (schemaVersion 3 → 4).
+- New dependency: `flutter_timezone`.
+- ADR-006 (Scheduler architecture), ADR-007 (Timezone handling).
+- Tests: `AlarmIdGenerator` (determinism, range), `DriftAlarmRepository`
+  (round-trip, overwrite-not-duplicate, delete), `SchedulerEngine`
+  (schedule/cancel/rescheduleAll, notifier-failure propagation, and
+  integration tests through `TaskEngine` for create/complete/snooze),
+  plus a new `getAllActiveOccurrences` test on the Fase 2 occurrence
+  repository.
+- Manual native step (documented, not generated): `AndroidManifest.xml`
+  needs `POST_NOTIFICATIONS` and `SCHEDULE_EXACT_ALARM` permissions.
+```

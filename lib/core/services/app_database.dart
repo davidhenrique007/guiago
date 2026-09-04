@@ -21,11 +21,6 @@ class AppMetadataTable extends Table {
 
 /// User profile + preferences captured during onboarding (Fase 1).
 /// Single-row table — always keyed by `id = 0`.
-///
-/// `@DataClassName('SettingsRow')` avoids a name collision with the
-/// Domain `Settings` entity (`features/onboarding/domain/settings.dart`)
-/// — this row is a persistence detail, mapped to/from `Settings` in
-/// the repository, and never leaks past the Data layer.
 @DataClassName('SettingsRow')
 class SettingsTable extends Table {
   @override
@@ -53,8 +48,6 @@ class SettingsTable extends Table {
 }
 
 /// A task's persisted row (Fase 2, master spec §10, §15).
-/// `@DataClassName('TaskRow')` keeps this a Data-layer detail,
-/// separate from the Domain `Task` entity.
 @DataClassName('TaskRow')
 class TasksTable extends Table {
   @override
@@ -83,8 +76,6 @@ class TasksTable extends Table {
 }
 
 /// A single scheduled instance of a task (Fase 2, master spec §10).
-/// `@DataClassName('TaskOccurrenceRow')` keeps this a Data-layer
-/// detail, separate from the Domain `TaskOccurrence` entity.
 @DataClassName('TaskOccurrenceRow')
 @TableIndex(name: 'idx_occurrences_task_id', columns: {#taskId})
 class TaskOccurrencesTable extends Table {
@@ -112,8 +103,6 @@ class TaskOccurrencesTable extends Table {
 
 /// An append-only occurrence status-transition log entry (Fase 2,
 /// master spec §10 — "the system must preserve history").
-/// `@DataClassName('TaskEventRow')` keeps this a Data-layer detail,
-/// separate from the Domain `TaskEvent` entity.
 @DataClassName('TaskEventRow')
 @TableIndex(name: 'idx_events_occurrence_id', columns: {#occurrenceId})
 class TaskEventsTable extends Table {
@@ -132,34 +121,22 @@ class TaskEventsTable extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-/// The link between one [TaskOccurrencesTable] row and the native OS
-/// alarm scheduled for it (Fase 3, master spec §10, §13).
-/// `@DataClassName('AlarmRecordRow')` keeps this a Data-layer detail,
-/// separate from the Domain `AlarmRecord` entity.
-///
-/// Every reschedule (snooze, edit, recovery) inserts a *new* row
-/// rather than mutating the old one — the previous row is kept with
-/// `status = cancelled` for history, matching the same
-/// preserve-history principle already used by [TaskEventsTable].
+/// Links a [TaskOccurrence] to the native alarm scheduled for it
+/// (Fase 3, master spec §13). Keyed by `occurrenceId` — an occurrence
+/// has at most one live alarm record at a time.
 @DataClassName('AlarmRecordRow')
-@TableIndex(name: 'idx_alarm_records_occurrence_id', columns: {#occurrenceId})
 class AlarmRecordsTable extends Table {
   @override
   String get tableName => 'alarm_records';
 
-  TextColumn get id => text()();
-  TextColumn get occurrenceId =>
-      text().references(TaskOccurrencesTable, #id)();
+  TextColumn get occurrenceId => text().references(TaskOccurrencesTable, #id)();
   TextColumn get taskId => text().references(TasksTable, #id)();
   IntColumn get nativeAlarmId => integer()();
   DateTimeColumn get scheduledAt => dateTime()();
-
-  /// One of: scheduled, fired, cancelled.
-  TextColumn get status => text()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
-  Set<Column<Object>> get primaryKey => {id};
+  Set<Column<Object>> get primaryKey => {occurrenceId};
 }
 
 @DriftDatabase(

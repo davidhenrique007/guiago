@@ -15,4 +15,9 @@ abstract interface class TaskOccurrenceRepository {
   /// for a task, if one exists — a task has at most one "live"
   /// occurrence at a time (master spec §12: one generated at a time).
   Future<Result<TaskOccurrence?>> getActiveOccurrenceForTask(String taskId);
+
+  /// All currently-live occurrences, across every task — the
+  /// foundation for `SchedulerEngine.rescheduleAll()` (Fase 3) and
+  /// Fase 7's boot recovery.
+  Future<Result<List<TaskOccurrence>>> getAllActiveOccurrences();
 }

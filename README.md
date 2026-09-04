@@ -1,3 +1,4 @@
+```markdown
 # GuiaGo
 
 > Organize. Aja. Avance.
@@ -14,7 +15,8 @@ phases (Fase 0 → Fase 8), one phase at a time, with a checkpoint
 
 **Fase 0 — Foundation + Architecture** ✅
 **Fase 1 — Design System + Onboarding** ✅
-**Fase 2 — Task Engine + Recurrence Engine** ✅ scaffolded, pending local verification (see "Getting started" below).
+**Fase 2 — Task Engine + Recurrence Engine** ✅
+**Fase 3 — Scheduler + Alarm System** ✅ scaffolded, pending local verification (see "Getting started" below).
 
 ## Getting started
 
@@ -44,9 +46,10 @@ the layered architecture and the decisions behind it.
 | 0 | Foundation + Architecture | ✅ |
 | 1 | Design System + Onboarding | ✅ |
 | 2 | Task Engine + Recurrence Engine | ✅ |
-| 3 | Scheduler + Alarm System | ⏳ |
+| 3 | Scheduler + Alarm System | ✅ |
 | 4 | TTS + Snooze + Tolerance | ⏳ |
 | 5 | Performance Engine + Gamification | ⏳ |
 | 6 | Dashboard + Analytics | ⏳ |
 | 7 | Reliability + Offline Recovery | ⏳ |
 | 8 | Production QA + MVP Release | ⏳ |
+```

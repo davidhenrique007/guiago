@@ -100,6 +100,24 @@ class DriftTaskOccurrenceRepository implements TaskOccurrenceRepository {
     }
   }
 
+  @override
+  Future<Result<List<TaskOccurrence>>> getAllActiveOccurrences() async {
+    try {
+      final List<String> liveNames =
+          _liveStatuses.map((OccurrenceStatus s) => s.name).toList();
+      final List<TaskOccurrenceRow> rows =
+          await (_db.select(_db.taskOccurrencesTable)
+                ..where((o) => o.status.isIn(liveNames))
+                ..orderBy([(o) => OrderingTerm.asc(o.scheduledAt)]))
+              .get();
+      return Success<List<TaskOccurrence>>(rows.map(_toDomain).toList());
+    } catch (e) {
+      return Fail<List<TaskOccurrence>>(
+        DatabaseFailure('Failed to load active occurrences', cause: e),
+      );
+    }
+  }
+
   TaskOccurrence _toDomain(TaskOccurrenceRow row) => TaskOccurrence(
         id: row.id,
         taskId: row.taskId,
