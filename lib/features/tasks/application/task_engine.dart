@@ -23,9 +23,8 @@ import '../domain/task_repository.dart';
 /// [alarmScheduler] is optional: when null (as in every Fase 2 test),
 /// the engine works exactly as it did before Fase 3 — no scheduling
 /// side effects. When provided, occurrence creation/resolution/snooze
-/// also keeps native alarms in sync (best-effort — a scheduling
-/// failure never fails the underlying task/occurrence operation; see
-/// ADR-006).
+/// also keeps native alarms in sync — best-effort, never blocking the
+/// underlying operation on a scheduling failure (see ADR-006).
 class TaskEngine {
   TaskEngine({
     required TaskRepository taskRepository,
@@ -108,6 +107,46 @@ class TaskEngine {
   Future<Result<void>> archiveTask(String taskId) => _tasks.archiveTask(taskId);
 
   Future<Result<void>> deleteTask(String taskId) => _tasks.deleteTask(taskId);
+
+  /// Marks the occurrence triggered — the alarm has fired and the
+  /// user is looking at it. Called by `AlarmRingController` when the
+  /// alarm screen opens (Fase 4).
+  Future<Result<TaskOccurrence>> triggerOccurrence(String occurrenceId) async {
+    final Result<TaskOccurrence?> fetchResult =
+        await _occurrences.getOccurrence(occurrenceId);
+    if (fetchResult case Fail<TaskOccurrence?>(:final failure)) {
+      return Fail<TaskOccurrence>(failure);
+    }
+    final TaskOccurrence? current = fetchResult.valueOrNull;
+    if (current == null) {
+      return Fail<TaskOccurrence>(
+        ValidationFailure('Occurrence $occurrenceId not found'),
+      );
+    }
+
+    final Result<OccurrenceStatus> transition =
+        OccurrenceStateMachine.transition(
+      current.status,
+      OccurrenceStatus.triggered,
+    );
+    if (transition case Fail<OccurrenceStatus>(:final failure)) {
+      return Fail<TaskOccurrence>(failure);
+    }
+
+    final TaskOccurrence triggered = current.copyWith(
+      status: OccurrenceStatus.triggered,
+      triggeredAt: DateTime.now(),
+    );
+    final Result<TaskOccurrence> saveResult =
+        await _occurrences.saveOccurrence(triggered);
+    if (saveResult case Fail<TaskOccurrence>(:final failure)) {
+      return Fail<TaskOccurrence>(failure);
+    }
+
+    await _recordEvent(current, OccurrenceStatus.triggered);
+
+    return Success<TaskOccurrence>(triggered);
+  }
 
   /// Marks the occurrence completed and, if the task recurs,
   /// generates and schedules the next occurrence.

@@ -29,6 +29,7 @@ class _FakeAlarmNotifier implements AlarmNotifier {
     required String title,
     required String body,
     required DateTime scheduledAt,
+    required String payload,
   }) async {
     if (failScheduling) {
       return const Fail<void>(AlarmFailure('forced failure'));
@@ -49,6 +50,12 @@ class _FakeAlarmNotifier implements AlarmNotifier {
     scheduledIds.clear();
     return const Success<void>(null);
   }
+
+  @override
+  Stream<String> get onNotificationTapped => const Stream<String>.empty();
+
+  @override
+  Future<String?> checkLaunchPayload() async => null;
 }
 
 void main() {

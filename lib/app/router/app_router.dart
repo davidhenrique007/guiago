@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
+import '../../features/alarms/presentation/screens/alarm_screen.dart';
 
 part 'app_routes.dart';
 
@@ -36,6 +37,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.homeName,
         builder: (BuildContext context, GoRouterState state) =>
             const _BootstrapPlaceholderScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.alarm,
+        name: AppRoutes.alarmName,
+        builder: (BuildContext context, GoRouterState state) => AlarmScreen(
+          occurrenceId: state.pathParameters['occurrenceId']!,
+        ),
       ),
     ],
   );

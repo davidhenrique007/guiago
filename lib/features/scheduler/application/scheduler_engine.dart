@@ -42,6 +42,7 @@ class SchedulerEngine implements AlarmScheduler {
       title: title,
       body: 'Está agendado para agora.',
       scheduledAt: occurrence.scheduledAt,
+      payload: occurrence.id,
     );
     if (scheduleResult case Fail<void>(:final failure)) {
       return Fail<void>(failure);

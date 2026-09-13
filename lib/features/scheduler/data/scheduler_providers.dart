@@ -5,12 +5,13 @@ import '../../../core/services/database_provider.dart';
 import '../../tasks/application/task_engine.dart';
 import '../../tasks/data/task_providers.dart';
 import '../application/scheduler_engine.dart';
+import '../domain/alarm_notifier.dart';
 import '../domain/alarm_repository.dart';
 import '../infrastructure/notification_service.dart';
 import 'drift_alarm_repository.dart';
 
-final Provider<NotificationService> notificationServiceProvider =
-    Provider<NotificationService>((ref) => NotificationService());
+final Provider<AlarmNotifier> notificationServiceProvider =
+    Provider<AlarmNotifier>((ref) => NotificationService());
 
 final Provider<AlarmRepository> alarmRepositoryProvider =
     Provider<AlarmRepository>((ref) {

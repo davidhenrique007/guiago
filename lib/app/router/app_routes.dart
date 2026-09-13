@@ -14,4 +14,7 @@ abstract final class AppRoutes {
 
   static const String home = '/home';
   static const String homeName = 'home';
+
+  static const String alarm = '/alarm/:occurrenceId';
+  static const String alarmName = 'alarm';
 }
