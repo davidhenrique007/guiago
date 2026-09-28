@@ -63,12 +63,10 @@ class AlarmRingController extends AsyncNotifier<AlarmRingUiState> {
 
     // Re-opening the screen on an already-TRIGGERED occurrence is not
     // an error — just load it as-is instead of re-triggering.
-    if (occurrence == null) {
-      occurrence = (await ref
+    occurrence ??= (await ref
               .read(taskOccurrenceRepositoryProvider)
               .getOccurrence(occurrenceId))
           .valueOrNull;
-    }
     if (occurrence == null) {
       throw StateError('Occurrence $occurrenceId not found');
     }

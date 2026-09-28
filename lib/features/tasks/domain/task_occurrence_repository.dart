@@ -20,4 +20,14 @@ abstract interface class TaskOccurrenceRepository {
   /// foundation for `SchedulerEngine.rescheduleAll()` (Fase 3) and
   /// Fase 7's boot recovery.
   Future<Result<List<TaskOccurrence>>> getAllActiveOccurrences();
+
+  /// All occurrences scheduled within [start, end] (inclusive),
+  /// across every task, regardless of status — the foundation for
+  /// Fase 5's PerformanceEngine and StreakEngine, which need every
+  /// terminal outcome (COMPLETED/MISSED/DECLINED) in a period, not
+  /// just the live ones.
+  Future<Result<List<TaskOccurrence>>> getOccurrencesInRange(
+    DateTime start,
+    DateTime end,
+  );
 }

@@ -118,6 +118,29 @@ class DriftTaskOccurrenceRepository implements TaskOccurrenceRepository {
     }
   }
 
+  @override
+  Future<Result<List<TaskOccurrence>>> getOccurrencesInRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      final List<TaskOccurrenceRow> rows =
+          await (_db.select(_db.taskOccurrencesTable)
+                ..where(
+                  (o) =>
+                      o.scheduledAt.isBiggerOrEqualValue(start) &
+                      o.scheduledAt.isSmallerOrEqualValue(end),
+                )
+                ..orderBy([(o) => OrderingTerm.asc(o.scheduledAt)]))
+              .get();
+      return Success<List<TaskOccurrence>>(rows.map(_toDomain).toList());
+    } catch (e) {
+      return Fail<List<TaskOccurrence>>(
+        DatabaseFailure('Failed to load occurrences in range', cause: e),
+      );
+    }
+  }
+
   TaskOccurrence _toDomain(TaskOccurrenceRow row) => TaskOccurrence(
         id: row.id,
         taskId: row.taskId,

@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/result/result.dart';
 import '../domain/alarm_scheduler.dart';
+import '../domain/occurrence_outcome_recorder.dart';
 import '../domain/occurrence_state_machine.dart';
 import '../domain/occurrence_status.dart';
 import '../domain/recurrence_engine.dart';
@@ -25,23 +26,32 @@ import '../domain/task_repository.dart';
 /// side effects. When provided, occurrence creation/resolution/snooze
 /// also keeps native alarms in sync — best-effort, never blocking the
 /// underlying operation on a scheduling failure (see ADR-006).
+///
+/// [outcomeRecorder] is the same kind of optional, best-effort hook,
+/// added in Fase 5: when provided, every terminal resolution
+/// (completed/declined/missed) is reported to it — e.g. so the
+/// Performance feature can score it — without TaskEngine ever
+/// importing that feature.
 class TaskEngine {
   TaskEngine({
     required TaskRepository taskRepository,
     required TaskOccurrenceRepository occurrenceRepository,
     required TaskEventRepository eventRepository,
     AlarmScheduler? alarmScheduler,
+    OccurrenceOutcomeRecorder? outcomeRecorder,
     Uuid? uuid,
   })  : _tasks = taskRepository,
         _occurrences = occurrenceRepository,
         _events = eventRepository,
         _alarmScheduler = alarmScheduler,
+        _outcomeRecorder = outcomeRecorder,
         _uuid = uuid ?? const Uuid();
 
   final TaskRepository _tasks;
   final TaskOccurrenceRepository _occurrences;
   final TaskEventRepository _events;
   final AlarmScheduler? _alarmScheduler;
+  final OccurrenceOutcomeRecorder? _outcomeRecorder;
   final Uuid _uuid;
 
   /// Creates a task and its first occurrence at [scheduledAt].
@@ -291,6 +301,8 @@ class TaskEngine {
     if (next != null) {
       await _alarmScheduler?.scheduleOccurrence(next);
     }
+
+    await _outcomeRecorder?.onOccurrenceResolved(resolved);
 
     return Success<TaskOccurrence>(resolved);
   }

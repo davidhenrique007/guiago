@@ -23,7 +23,7 @@ class AlarmScreen extends ConsumerWidget {
     ref.listen<AsyncValue<AlarmRingUiState>>(
       alarmRingControllerProvider(occurrenceId),
       (AsyncValue<AlarmRingUiState>? previous,
-          AsyncValue<AlarmRingUiState> next) {
+          AsyncValue<AlarmRingUiState> next,) {
         final bool resolved = switch (next) {
           AsyncData<AlarmRingUiState>(:final value) => value.isResolved,
           _ => false,

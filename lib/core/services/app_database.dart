@@ -139,6 +139,118 @@ class AlarmRecordsTable extends Table {
   Set<Column<Object>> get primaryKey => {occurrenceId};
 }
 
+/// Agregado de desempenho para uma janela de tempo (Fase 5,
+/// master spec §15, §18). Múltiplas linhas — uma por período
+/// calculado (dia/semana/mês).
+@DataClassName('PerformanceRecordRow')
+@TableIndex(
+  name: 'idx_performance_records_period',
+  columns: {#periodStart},
+)
+class PerformanceRecordsTable extends Table {
+  @override
+  String get tableName => 'performance_records';
+
+  TextColumn get id => text()();
+  DateTimeColumn get periodStart => dateTime()();
+  DateTimeColumn get periodEnd => dateTime()();
+
+  IntColumn get totalOccurrences => integer()();
+  IntColumn get completedCount => integer()();
+  IntColumn get completedAfterSnoozeCount => integer()();
+  IntColumn get missedCount => integer()();
+  IntColumn get declinedCount => integer()();
+  IntColumn get snoozedCount => integer()();
+
+  RealColumn get completionRate => real()();
+  RealColumn get missRate => real()();
+  RealColumn get snoozeRate => real()();
+
+  /// Em segundos — mesma convenção do responseTimeSeconds em
+  /// TaskOccurrencesTable. Null quando não há resposta registada.
+  IntColumn get averageResponseTimeSeconds => integer().nullable()();
+
+  DateTimeColumn get calculatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Ledger auditável de pontuação (Fase 5, master spec §19) —
+/// append-only, nunca editado. O agregado fica em ScoresTable.
+@DataClassName('ScoreEntryRow')
+@TableIndex(
+  name: 'idx_score_entries_occurrence_id',
+  columns: {#occurrenceId},
+)
+class ScoreEntriesTable extends Table {
+  @override
+  String get tableName => 'score_entries';
+
+  TextColumn get id => text()();
+  TextColumn get occurrenceId => text().references(TaskOccurrencesTable, #id)();
+
+  /// One of: completed, completedAfterSnooze, missed, declined.
+  TextColumn get reason => text()();
+  IntColumn get points => integer()();
+  DateTimeColumn get occurredAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Score agregado — single-row, sempre `id = 0` (mesmo padrão do
+/// SettingsTable: app single-user local).
+@DataClassName('ScoreRow')
+class ScoresTable extends Table {
+  @override
+  String get tableName => 'scores';
+
+  IntColumn get id => integer().withDefault(const Constant(0))();
+  IntColumn get total => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Histórico de avaliações de nível (Fase 5, master spec §15, §20).
+/// Múltiplas linhas — cada avaliação do LevelEngine gera uma.
+@DataClassName('LevelRow')
+class LevelsTable extends Table {
+  @override
+  String get tableName => 'levels';
+
+  TextColumn get id => text()();
+
+  /// One of: beginner, consistent, disciplined, elite.
+  TextColumn get tier => text()();
+  TextColumn get previousTier => text()();
+
+  IntColumn get scoreAtEvaluation => integer()();
+  DateTimeColumn get evaluatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Streak agregado — single-row, sempre `id = 0` (mesmo padrão
+/// do ScoresTable).
+@DataClassName('StreakStatusRow')
+class StreakStatusTable extends Table {
+  @override
+  String get tableName => 'streak_status';
+
+  IntColumn get id => integer().withDefault(const Constant(0))();
+  IntColumn get currentStreak => integer().withDefault(const Constant(0))();
+  IntColumn get longestStreak => integer().withDefault(const Constant(0))();
+  DateTimeColumn get lastFulfilledDate => dateTime().nullable()();
+  DateTimeColumn get calculatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     AppMetadataTable,
@@ -147,6 +259,11 @@ class AlarmRecordsTable extends Table {
     TaskOccurrencesTable,
     TaskEventsTable,
     AlarmRecordsTable,
+    PerformanceRecordsTable,
+    ScoreEntriesTable,
+    ScoresTable,
+    LevelsTable,
+    StreakStatusTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -157,7 +274,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -175,6 +292,13 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.createTable(alarmRecordsTable);
+          }
+          if (from < 5) {
+            await m.createTable(performanceRecordsTable);
+            await m.createTable(scoreEntriesTable);
+            await m.createTable(scoresTable);
+            await m.createTable(levelsTable);
+            await m.createTable(streakStatusTable);
           }
         },
       );

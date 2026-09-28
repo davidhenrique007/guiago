@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_database.dart';
 import '../../../core/services/database_provider.dart';
+import '../../performance/data/performance_providers.dart';
 import '../../tasks/application/task_engine.dart';
 import '../../tasks/data/task_providers.dart';
 import '../application/scheduler_engine.dart';
@@ -41,5 +42,6 @@ final Provider<TaskEngine> taskEngineWithSchedulerProvider =
     occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
     eventRepository: ref.watch(taskEventRepositoryProvider),
     alarmScheduler: ref.watch(schedulerEngineProvider),
+    outcomeRecorder: ref.watch(performanceControllerProvider),
   );
 });
