@@ -15,6 +15,12 @@ abstract final class AppRoutes {
   static const String home = '/home';
   static const String homeName = 'home';
 
+  static const String dashboard = '/dashboard';
+  static const String dashboardName = 'dashboard';
+
+  static const String taskCreate = '/tasks/create';
+  static const String taskCreateName = 'taskCreate';
+
   static const String alarm = '/alarm/:occurrenceId';
   static const String alarmName = 'alarm';
 }

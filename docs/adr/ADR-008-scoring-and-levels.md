@@ -33,7 +33,11 @@ below beginner). A window with no occurrences does not penalize.
 ## Consequences
 
 - Thresholds/points are placeholders: change them only in the policies.
-- Scoring is event-driven: `TaskEngine` reports every terminal resolution via
-  `OccurrenceOutcomeRecorder` (best-effort, same inversion pattern as
-  `AlarmScheduler`, ADR-006). Performance/streak/level are recalculated on
-  demand from `getOccurrencesInRange`.
+- Everything is event-driven: `TaskEngine` reports every terminal resolution
+  via `OccurrenceOutcomeRecorder` (best-effort, same inversion pattern as
+  `AlarmScheduler`, ADR-006). On each event `PerformanceController` scores the
+  occurrence, recalculates the streak over the full history, and re-evaluates
+  the level.
+- The `levels` table records level CHANGES only (plus the first evaluation),
+  not one row per evaluation.
+- Dashboard reads never write: period metrics are computed in memory.

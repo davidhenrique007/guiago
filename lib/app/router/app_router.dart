@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/alarms/presentation/screens/alarm_screen.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
+import '../../features/tasks/presentation/screens/task_create_screen.dart';
 
 part 'app_routes.dart';
 
@@ -36,7 +39,19 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.home,
         name: AppRoutes.homeName,
         builder: (BuildContext context, GoRouterState state) =>
-            const _BootstrapPlaceholderScreen(),
+            const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.dashboard,
+        name: AppRoutes.dashboardName,
+        builder: (BuildContext context, GoRouterState state) =>
+            const DashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.taskCreate,
+        name: AppRoutes.taskCreateName,
+        builder: (BuildContext context, GoRouterState state) =>
+            const TaskCreateScreen(),
       ),
       GoRoute(
         path: AppRoutes.alarm,
@@ -48,17 +63,3 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-/// Temporary landing screen, replaced by the real Home in Fase 6 (§22).
-class _BootstrapPlaceholderScreen extends StatelessWidget {
-  const _BootstrapPlaceholderScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('GuiaGo — Home (Fase 6 constrói isto)'),
-      ),
-    );
-  }
-}

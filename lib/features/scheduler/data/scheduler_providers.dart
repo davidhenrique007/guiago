@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/app_database.dart';
 import '../../../core/services/database_provider.dart';
+import '../../performance/application/performance_controller.dart';
 import '../../performance/data/performance_providers.dart';
 import '../../tasks/application/task_engine.dart';
 import '../../tasks/data/task_providers.dart';
@@ -37,11 +38,18 @@ final Provider<SchedulerEngine> schedulerEngineProvider =
 /// ADR-006).
 final Provider<TaskEngine> taskEngineWithSchedulerProvider =
     Provider<TaskEngine>((ref) {
+  // Extraído para variável local: passar ref.watch(...) diretamente
+  // como argumento de um parâmetro `OccurrenceOutcomeRecorder?` falha
+  // a inferência de tipo genérico do Riverpod (o mesmo tipo de
+  // problema que o comentário do AlarmRingController já menciona
+  // para AsyncValue.valueOrNull).
+  final PerformanceController performanceController =
+      ref.watch(performanceControllerProvider);
   return TaskEngine(
     taskRepository: ref.watch(taskRepositoryProvider),
     occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
     eventRepository: ref.watch(taskEventRepositoryProvider),
     alarmScheduler: ref.watch(schedulerEngineProvider),
-    outcomeRecorder: ref.watch(performanceControllerProvider),
+    outcomeRecorder: performanceController,
   );
 });

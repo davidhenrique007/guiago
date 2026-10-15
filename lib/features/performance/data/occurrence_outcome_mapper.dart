@@ -75,7 +75,7 @@ class OccurrenceOutcomeMapper {
 
     for (var day = _dateOnly(rangeStart);
         !day.isAfter(_dateOnly(rangeEnd));
-        day = day.add(const Duration(days: 1))) {
+        day = DateTime(day.year, day.month, day.day + 1)) {
       final dayOccurrences = byDay[day];
 
       if (dayOccurrences == null || dayOccurrences.isEmpty) {

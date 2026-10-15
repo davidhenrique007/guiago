@@ -14,6 +14,8 @@ export 'components/app_bottom_sheet.dart';
 export 'components/app_button.dart';
 export 'components/app_card.dart';
 export 'components/app_dialog.dart';
+export 'components/app_metric_card.dart';
 export 'components/app_progress.dart';
 export 'components/app_states.dart';
 export 'components/app_text_field.dart';
+export 'components/app_trend_chart.dart';

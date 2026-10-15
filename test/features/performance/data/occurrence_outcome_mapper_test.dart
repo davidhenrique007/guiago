@@ -31,7 +31,8 @@ void main() {
       expect(
         mapper
             .toOutcome(
-                occurrence(id: 'o1', status: OccurrenceStatus.completed),)!
+              occurrence(id: 'o1', status: OccurrenceStatus.completed),
+            )!
             .status,
         OutcomeStatus.completed,
       );
