@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../tasks/domain/occurrence_status.dart';
+import '../../../tasks/domain/task_priority.dart';
 import '../../domain/today_task_item.dart';
 
 /// Today's full list of occurrences (master spec §22).
@@ -39,29 +40,21 @@ class _TodayTaskTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(item.title, style: AppTypography.bodyLarge),
-                const SizedBox(height: 2),
-                Text(
-                  _timeLabel(item.scheduledAt),
-                  style: AppTypography.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-          AppBadge(
-            label: _statusLabel(item.status),
-            tone: _statusTone(item.status),
-          ),
-        ],
-      ),
+    return AppTaskCard(
+      time: _timeLabel(item.scheduledAt),
+      title: item.title,
+      statusLabel: _statusLabel(item.status),
+      tone: _tone(item),
     );
+  }
+
+  static AppTaskCardTone _tone(TodayTaskItem item) {
+    if (item.status == OccurrenceStatus.completed) return AppTaskCardTone.done;
+    return switch (item.priority) {
+      TaskPriority.high => AppTaskCardTone.high,
+      TaskPriority.medium => AppTaskCardTone.medium,
+      TaskPriority.low => AppTaskCardTone.low,
+    };
   }
 
   static String _timeLabel(DateTime dateTime) {
@@ -78,12 +71,5 @@ class _TodayTaskTile extends StatelessWidget {
         OccurrenceStatus.declined => 'Recusada',
         OccurrenceStatus.missed => 'Perdida',
         OccurrenceStatus.cancelled => 'Cancelada',
-      };
-
-  static AppBadgeTone _statusTone(OccurrenceStatus status) => switch (status) {
-        OccurrenceStatus.completed => AppBadgeTone.success,
-        OccurrenceStatus.missed => AppBadgeTone.error,
-        OccurrenceStatus.declined => AppBadgeTone.error,
-        _ => AppBadgeTone.neutral,
       };
 }

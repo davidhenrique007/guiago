@@ -5,11 +5,13 @@
 library;
 
 export '../app/theme/app_colors.dart';
+export '../app/theme/app_elevation.dart';
 export '../app/theme/app_motion.dart';
 export '../app/theme/app_spacing.dart';
 export '../app/theme/app_theme.dart';
 export '../app/theme/app_typography.dart';
 export 'components/app_badge.dart';
+export 'components/app_bottom_nav.dart';
 export 'components/app_bottom_sheet.dart';
 export 'components/app_button.dart';
 export 'components/app_card.dart';
@@ -17,5 +19,6 @@ export 'components/app_dialog.dart';
 export 'components/app_metric_card.dart';
 export 'components/app_progress.dart';
 export 'components/app_states.dart';
+export 'components/app_task_card.dart';
 export 'components/app_text_field.dart';
 export 'components/app_trend_chart.dart';

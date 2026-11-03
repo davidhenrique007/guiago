@@ -139,7 +139,7 @@ void main() {
 
       final result = await controller.recalculatePerformance(
         periodStart: daysAgo(1),
-        periodEnd: DateTime.now().add(const Duration(hours: 1)),
+        periodEnd: daysAgo(-1),
       );
 
       expect(result.isSuccess, isTrue);

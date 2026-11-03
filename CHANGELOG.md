@@ -117,3 +117,18 @@
 - Manual native step (documented, not generated): `AndroidManifest.xml`
   needs `POST_NOTIFICATIONS` and `SCHEDULE_EXACT_ALARM` permissions.
 ```
+
+### Changed
+- Dark theme from the approved designs: new `AppColors` values,
+  Fraunces / IBM Plex typography, `AppTheme.dark()` replaces
+  `AppTheme.light()`.
+- `AppCard`, `AppButton`, `AppTextField`, `AppProgress` restyled.
+- Home "Hoje" list uses `AppTaskCard`.
+- Alarm screen: background/text colors fixed for the dark theme.
+- Router: five-branch `StatefulShellRoute` with a bottom bar.
+
+### Added
+- `AppTaskCard`, `AppBottomNav`, `AppElevation`, `AppRadius.field/xl`.
+- `AppShell`, `AppPlaceholderScreen`.
+- ADR-010 (visual identity), ADR-011 (bottom navigation).
+- Tests for `AppTaskCard`, `AppBottomNav` and the shell.

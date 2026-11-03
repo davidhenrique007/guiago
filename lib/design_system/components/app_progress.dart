@@ -26,7 +26,7 @@ class AppProgress extends StatelessWidget {
           return LinearProgressIndicator(
             value: animatedValue,
             minHeight: 6,
-            backgroundColor: AppColors.surfaceMuted,
+            backgroundColor: AppColors.border,
             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
           );
         },

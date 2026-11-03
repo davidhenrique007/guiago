@@ -37,7 +37,7 @@ class AlarmScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: state.when(
           loading: () => const AppLoadingState(),
@@ -93,24 +93,20 @@ class _AlarmRingBody extends StatelessWidget {
         children: <Widget>[
           Text(
             'GuiaGo',
-            style: AppTypography.label.copyWith(color: AppColors.textOnPrimary),
+            style: AppTypography.label,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
             uiState.task.title,
-            style: AppTypography.displayLarge.copyWith(
-              color: AppColors.textOnPrimary,
-            ),
+            style: AppTypography.displayLarge,
             textAlign: TextAlign.center,
           ),
           if (uiState.task.description != null) ...<Widget>[
             const SizedBox(height: AppSpacing.sm),
             Text(
               uiState.task.description!,
-              style: AppTypography.bodyLarge.copyWith(
-                color: AppColors.textOnPrimary,
-              ),
+              style: AppTypography.bodyMedium,
               textAlign: TextAlign.center,
             ),
           ],

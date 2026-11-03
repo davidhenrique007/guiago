@@ -59,7 +59,7 @@ class AppButton extends StatelessWidget {
             disabledForegroundColor: foreground,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           ),
@@ -82,9 +82,7 @@ class AppButton extends StatelessWidget {
                     ],
                     Text(
                       label,
-                      style: AppTypography.titleMedium.copyWith(
-                        color: foreground,
-                      ),
+                      style: AppTypography.button.copyWith(color: foreground),
                     ),
                   ],
                 ),

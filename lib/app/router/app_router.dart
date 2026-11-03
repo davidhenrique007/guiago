@@ -9,6 +9,8 @@ import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/tasks/presentation/screens/task_create_screen.dart';
+import 'app_placeholder_screen.dart';
+import 'app_shell.dart';
 
 part 'app_routes.dart';
 
@@ -35,11 +37,74 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         builder: (BuildContext context, GoRouterState state) =>
             const OnboardingScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        name: AppRoutes.homeName,
-        builder: (BuildContext context, GoRouterState state) =>
-            const HomeScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell navigationShell,
+        ) =>
+            AppShell(navigationShell: navigationShell),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: AppRoutes.home,
+                name: AppRoutes.homeName,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: AppRoutes.tasks,
+                name: AppRoutes.tasksName,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const AppPlaceholderScreen(
+                  title: 'Tarefas',
+                  icon: Icons.check_box_outlined,
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: AppRoutes.calendar,
+                name: AppRoutes.calendarName,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const AppPlaceholderScreen(
+                  title: 'Calendário',
+                  icon: Icons.calendar_today_outlined,
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: AppRoutes.progress,
+                name: AppRoutes.progressName,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const DashboardScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: AppRoutes.profile,
+                name: AppRoutes.profileName,
+                builder: (BuildContext context, GoRouterState state) =>
+                    const AppPlaceholderScreen(
+                  title: 'Perfil',
+                  icon: Icons.person_outline,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.dashboard,

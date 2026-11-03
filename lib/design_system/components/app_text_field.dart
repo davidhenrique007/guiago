@@ -44,17 +44,17 @@ class AppTextField extends StatelessWidget {
             hintText: hint,
             errorText: errorText,
             filled: true,
-            fillColor: AppColors.surfaceMuted,
+            fillColor: AppColors.surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.sm,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(AppRadius.field),
+              borderSide: const BorderSide(color: AppColors.borderSoft),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.field),
               borderSide:
                   const BorderSide(color: AppColors.primary, width: 1.5),
             ),

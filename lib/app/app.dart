@@ -52,7 +52,7 @@ class _GuiaGoAppState extends ConsumerState<GuiaGoApp> {
     return MaterialApp.router(
       title: 'GuiaGo',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
+      theme: AppTheme.dark(),
       routerConfig: router,
     );
   }
