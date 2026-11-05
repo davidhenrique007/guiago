@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/alarms/presentation/screens/alarm_screen.dart';
+import '../../features/calendar/presentation/screens/calendar_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
+import '../../features/insights/presentation/screens/insights_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
@@ -74,10 +76,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.calendar,
                 name: AppRoutes.calendarName,
                 builder: (BuildContext context, GoRouterState state) =>
-                    const AppPlaceholderScreen(
-                  title: 'Calendário',
-                  icon: Icons.calendar_today_outlined,
-                ),
+                    const CalendarScreen(),
               ),
             ],
           ),
@@ -101,16 +100,18 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                   title: 'Perfil',
                   icon: Icons.person_outline,
                 ),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'insights',
+                    name: AppRoutes.profileInsightsName,
+                    builder: (BuildContext context, GoRouterState state) =>
+                        const InsightsScreen(),
+                  ),
+                ],
               ),
             ],
           ),
         ],
-      ),
-      GoRoute(
-        path: AppRoutes.dashboard,
-        name: AppRoutes.dashboardName,
-        builder: (BuildContext context, GoRouterState state) =>
-            const DashboardScreen(),
       ),
       GoRoute(
         path: AppRoutes.taskCreate,

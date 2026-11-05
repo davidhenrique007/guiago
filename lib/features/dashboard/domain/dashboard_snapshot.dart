@@ -28,5 +28,14 @@ sealed class DashboardSnapshot with _$DashboardSnapshot {
     required Score score,
     LevelStatus? level,
     StreakStatus? streak,
+
+    /// The tier after the current one, and how far away it is. Both
+    /// null when there is nothing to show (top tier, or the level is
+    /// held back by recent performance) — see `NextLevelProgress`.
+    LevelTier? nextTier,
+    int? pointsToNextTier,
+
+    /// 0.0–1.0 position between the current and the next threshold.
+    double? nextTierProgress,
   }) = _DashboardSnapshot;
 }

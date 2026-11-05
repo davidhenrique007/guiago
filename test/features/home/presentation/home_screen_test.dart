@@ -70,12 +70,6 @@ void main() {
           builder: (BuildContext context, GoRouterState state) =>
               const HomeScreen(),
         ),
-        GoRoute(
-          path: AppRoutes.dashboard,
-          name: AppRoutes.dashboardName,
-          builder: (BuildContext context, GoRouterState state) =>
-              const Scaffold(body: Text('DASHBOARD')),
-        ),
       ],
     );
 
@@ -117,16 +111,5 @@ void main() {
 
     expect(find.text('Beber água'), findsNWidgets(2)); // próxima + lista
     expect(find.text('0 de 1 concluídas'), findsOneWidget);
-  });
-
-  testWidgets('tapping the insights icon navigates to the dashboard', (
-    WidgetTester tester,
-  ) async {
-    await pumpHomeScreen(tester);
-
-    await tester.tap(find.byIcon(Icons.insights_outlined));
-    await tester.pumpAndSettle();
-
-    expect(find.text('DASHBOARD'), findsOneWidget);
   });
 }

@@ -5,14 +5,16 @@ import '../../../../design_system/design_system.dart';
 import '../../application/dashboard_controller.dart';
 import '../../domain/dashboard_period.dart';
 import '../../domain/dashboard_snapshot.dart';
-import '../widgets/dashboard_metrics_grid.dart';
 import '../widgets/dashboard_period_selector.dart';
 import '../widgets/dashboard_trend_section.dart';
+import '../widgets/progress_completion_card.dart';
+import '../widgets/progress_level_card.dart';
+import '../widgets/progress_streak_card.dart';
 
-/// The Dashboard (master spec §6/§22): Score, Nível, Streak and
-/// Completion Rate for a rolling Hoje/Semana/Mês window, plus a
-/// trend chart. Purely a view over what [DashboardController] loads
-/// — this screen never computes a metric itself (§6: "a UI não deve
+/// "Meu progresso" (the Progresso tab): completion rate, streak,
+/// level and a trend chart for a rolling Hoje/Semana/Mês window.
+/// Purely a view over what [DashboardController] loads — this screen
+/// never computes a metric itself (master spec §6: "a UI não deve
 /// calcular métricas").
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -22,7 +24,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  DashboardPeriod _period = DashboardPeriod.today;
+  DashboardPeriod _period = DashboardPeriod.week;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: Text('Desempenho', style: AppTypography.titleLarge),
+        title: Text('Meu progresso', style: AppTypography.titleLarge),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -56,14 +58,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: AppSpacing.lg),
               // Pattern-matching, not `.when()` — same convention as
               // AlarmRingController (AsyncValue.valueOrNull was
-              // removed in Riverpod 3.0; see its comment on
-              // `_currentState`).
+              // removed in Riverpod 3.0).
               switch (snapshotAsync) {
                 AsyncData<DashboardSnapshot>(:final value) => Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      DashboardMetricsGrid(snapshot: value),
-                      const SizedBox(height: AppSpacing.lg),
+                      ProgressCompletionCard(snapshot: value),
+                      const SizedBox(height: AppSpacing.md),
+                      ProgressStreakCard(snapshot: value),
+                      const SizedBox(height: AppSpacing.md),
+                      ProgressLevelCard(snapshot: value),
+                      const SizedBox(height: AppSpacing.md),
                       DashboardTrendSection(snapshot: value),
                     ],
                   ),
@@ -72,7 +77,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       vertical: AppSpacing.xxl,
                     ),
                     child: AppErrorState(
-                      message: 'Não foi possível carregar o desempenho.',
+                      message: 'Não foi possível carregar o progresso.',
                       onRetry: () => ref
                           .read(dashboardControllerProvider(_period).notifier)
                           .refresh(),

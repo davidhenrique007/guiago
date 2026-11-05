@@ -58,29 +58,35 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows zeroed metrics when there is no data', (
+  testWidgets('shows the empty Meu progresso cards when there is no data', (
     WidgetTester tester,
   ) async {
     await pumpDashboardScreen(tester);
 
-    expect(find.text('Desempenho'), findsOneWidget);
-    expect(find.text('0'), findsOneWidget); // Pontuação
-    expect(find.text('Iniciante'), findsOneWidget); // Nível
-    expect(find.text('0 dias'), findsOneWidget); // Sequência
-    expect(find.text('—'), findsOneWidget); // Conclusão, sem dados
+    expect(find.text('Meu progresso'), findsOneWidget);
+    expect(find.text('TAXA DE CUMPRIMENTO'), findsOneWidget);
+    expect(find.text('—'), findsOneWidget); // no data: no percentage
+    expect(find.text('0 dias'), findsOneWidget); // streak
+    expect(find.text('Melhor streak: 0 dias'), findsOneWidget);
+    expect(find.text('Iniciante'), findsOneWidget); // level
+    expect(find.text('Faltam 100 pontos para Consistente'), findsOneWidget);
   });
 
-  testWidgets('shows completion for today from a completed occurrence', (
+  testWidgets('starts on the week window and counts a completed task', (
     WidgetTester tester,
   ) async {
-    await seedOccurrence(DateTime.now(), OccurrenceStatus.completed);
+    // Two days ago is inside the 7-day window but outside "Hoje".
+    await seedOccurrence(
+      DateTime.now().subtract(const Duration(days: 2)),
+      OccurrenceStatus.completed,
+    );
 
     await pumpDashboardScreen(tester);
 
     expect(find.text('100%'), findsOneWidget);
   });
 
-  testWidgets('switching to Semana reveals data outside today', (
+  testWidgets('switching to Hoje hides data from earlier days', (
     WidgetTester tester,
   ) async {
     await seedOccurrence(
@@ -89,11 +95,30 @@ void main() {
     );
 
     await pumpDashboardScreen(tester);
-    expect(find.text('—'), findsOneWidget); // Hoje: nada agendado hoje
+    expect(find.text('100%'), findsOneWidget);
 
-    await tester.tap(find.text('Semana'));
+    await tester.tap(find.text('Hoje'));
     await tester.pumpAndSettle();
 
-    expect(find.text('100%'), findsOneWidget);
+    expect(find.text('100%'), findsNothing);
+    expect(find.text('—'), findsOneWidget);
+  });
+
+  testWidgets('missed and declined are both counted as not fulfilled', (
+    WidgetTester tester,
+  ) async {
+    await seedOccurrence(
+      DateTime.now().subtract(const Duration(days: 1)),
+      OccurrenceStatus.missed,
+    );
+    await seedOccurrence(
+      DateTime.now().subtract(const Duration(days: 2)),
+      OccurrenceStatus.declined,
+    );
+
+    await pumpDashboardScreen(tester);
+
+    expect(find.text('Não cumpridas'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
   });
 }

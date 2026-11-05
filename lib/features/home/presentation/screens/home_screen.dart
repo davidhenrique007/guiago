@@ -28,13 +28,6 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.insights_outlined),
-            tooltip: 'Desempenho',
-            onPressed: () => context.pushNamed(AppRoutes.dashboardName),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.primary,

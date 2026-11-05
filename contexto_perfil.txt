@@ -1,0 +1,154 @@
+﻿
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\onboarding\data\drift_settings_repository.dart
+import 'package:drift/drift.dart';
+
+import '../../../core/errors/failures.dart';
+import '../../../core/result/result.dart';
+import '../../../core/services/app_database.dart';
+import '../domain/settings.dart';
+import '../domain/settings_repository.dart';
+
+/// The single row we ever read/write in `settings`.
+const int _kSettingsRowId = 0;
+
+class DriftSettingsRepository implements SettingsRepository {
+  DriftSettingsRepository(this._db);
+
+  final AppDatabase _db;
+
+  @override
+  Future<Result<Settings>> getSettings() async {
+    try {
+      final SettingsRow? row = await (_db.select(_db.settingsTable)
+            ..where((SettingsTable t) => t.id.equals(_kSettingsRowId)))
+          .getSingleOrNull();
+
+      if (row == null) return const Success<Settings>(Settings.initial);
+      return Success<Settings>(_toDomain(row));
+    } catch (e) {
+      return Fail<Settings>(
+        DatabaseFailure('Failed to load settings', cause: e),
+      );
+    }
+  }
+
+  @override
+  Future<Result<void>> saveSettings(Settings settings) async {
+    try {
+      await _db.into(_db.settingsTable).insertOnConflictUpdate(
+            SettingsTableCompanion.insert(
+              id: const Value<int>(_kSettingsRowId),
+              userName: Value<String>(settings.userName),
+              mainObjective: Value<String>(settings.mainObjective),
+              dayStartMinutes: Value<int>(settings.dayStartMinutes),
+              dayEndMinutes: Value<int>(settings.dayEndMinutes),
+              notificationsEnabled: Value<bool>(settings.notificationsEnabled),
+              ttsEnabled: Value<bool>(settings.ttsEnabled),
+              defaultSnoozeMinutes: Value<int>(settings.defaultSnoozeMinutes),
+              defaultToleranceMinutes:
+                  Value<int>(settings.defaultToleranceMinutes),
+              onboardingCompleted: Value<bool>(settings.onboardingCompleted),
+            ),
+          );
+      return const Success<void>(null);
+    } catch (e) {
+      return Fail<void>(
+        DatabaseFailure('Failed to save settings', cause: e),
+      );
+    }
+  }
+
+  Settings _toDomain(SettingsRow row) => Settings(
+        userName: row.userName,
+        mainObjective: row.mainObjective,
+        dayStartMinutes: row.dayStartMinutes,
+        dayEndMinutes: row.dayEndMinutes,
+        notificationsEnabled: row.notificationsEnabled,
+        ttsEnabled: row.ttsEnabled,
+        defaultSnoozeMinutes: row.defaultSnoozeMinutes,
+        defaultToleranceMinutes: row.defaultToleranceMinutes,
+        onboardingCompleted: row.onboardingCompleted,
+      );
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\onboarding\data\settings_repository_provider.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/services/app_database.dart';
+import '../../../core/services/database_provider.dart';
+import '../domain/settings_repository.dart';
+import 'drift_settings_repository.dart';
+
+/// Application/Presentation code depends on [SettingsRepository]
+/// (the interface); this provider is the only place that knows the
+/// concrete implementation is Drift-backed.
+final Provider<SettingsRepository> settingsRepositoryProvider =
+    Provider<SettingsRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftSettingsRepository(db);
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\onboarding\domain\settings.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'settings.freezed.dart';
+
+/// User profile + preferences captured during onboarding (master spec
+/// §Fase 1: Perfil, Objetivo principal, horário de início/fim do dia,
+/// preferências de notificação, TTS, snooze e tolerância padrão).
+///
+/// Pure Dart, Freezed value model — no Flutter, no Drift import here.
+@freezed
+sealed class Settings with _$Settings {
+  const factory Settings({
+    required String userName,
+    required String mainObjective,
+    required int dayStartMinutes,
+    required int dayEndMinutes,
+    required bool notificationsEnabled,
+    required bool ttsEnabled,
+    required int defaultSnoozeMinutes,
+    required int defaultToleranceMinutes,
+    required bool onboardingCompleted,
+  }) = _Settings;
+
+  const Settings._();
+
+  /// Defaults shown the first time onboarding runs.
+  static const Settings initial = Settings(
+    userName: '',
+    mainObjective: '',
+    dayStartMinutes: 7 * 60,
+    dayEndMinutes: 22 * 60,
+    notificationsEnabled: true,
+    ttsEnabled: true,
+    defaultSnoozeMinutes: 10,
+    defaultToleranceMinutes: 15,
+    onboardingCompleted: false,
+  );
+
+  String get dayStartLabel => _formatMinutes(dayStartMinutes);
+  String get dayEndLabel => _formatMinutes(dayEndMinutes);
+
+  static String _formatMinutes(int minutes) {
+    final int h = minutes ~/ 60;
+    final int m = minutes % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\onboarding\domain\settings_repository.dart
+import '../../../core/result/result.dart';
+import 'settings.dart';
+
+/// Domain-facing contract for reading/writing [Settings]. The Data
+/// layer provides the real (Drift-backed) implementation — Domain
+/// and Application code depend only on this interface.
+abstract interface class SettingsRepository {
+  /// Returns the stored [Settings], or [Settings.initial] if none
+  /// have been saved yet.
+  Future<Result<Settings>> getSettings();
+
+  /// Persists [settings], replacing whatever was stored before.
+  Future<Result<void>> saveSettings(Settings settings);
+}

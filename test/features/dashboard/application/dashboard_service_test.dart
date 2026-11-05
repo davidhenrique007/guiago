@@ -6,6 +6,7 @@ import 'package:guiago/features/dashboard/domain/dashboard_period.dart';
 import 'package:guiago/features/performance/application/performance_engine.dart';
 import 'package:guiago/features/performance/data/occurrence_outcome_mapper.dart';
 import 'package:guiago/features/performance/domain/level.dart';
+import 'package:guiago/features/performance/domain/level_policy.dart';
 import 'package:guiago/features/performance/domain/score.dart';
 import 'package:guiago/features/performance/domain/streak_status.dart';
 import 'package:guiago/features/tasks/domain/occurrence_status.dart';
@@ -176,6 +177,77 @@ void main() {
 
       expect(result.isFailure, isTrue);
       expect(result.failureOrNull, isA<DatabaseFailure>());
+    });
+
+    group('next level', () {
+      LevelStatus status(LevelTier tier) => LevelStatus(
+            id: 'l1',
+            tier: tier,
+            previousTier: LevelTier.beginner,
+            scoreAtEvaluation: 0,
+            evaluatedAt: now,
+          );
+
+      test('beginner with 30 points is 70 away from consistent', () async {
+        scores.score = Score(total: 30, updatedAt: now);
+
+        final snapshot =
+            (await service.load(DashboardPeriod.week, now: now)).valueOrNull!;
+
+        expect(snapshot.nextTier, LevelTier.consistent);
+        expect(snapshot.pointsToNextTier, 70);
+        expect(snapshot.nextTierProgress, closeTo(0.3, 1e-9));
+      });
+
+      test('uses the injected policy', () async {
+        service = DashboardService(
+          occurrenceRepository: occurrences,
+          mapper: const OccurrenceOutcomeMapper(),
+          performanceEngine: const PerformanceEngine(),
+          trendEngine: const TrendEngine(),
+          scoreRepository: scores,
+          levelRepository: levels,
+          streakRepository: streaks,
+          policy: const LevelPolicy(
+            scoreThresholds: {
+              LevelTier.elite: 70,
+              LevelTier.disciplined: 30,
+              LevelTier.consistent: 10,
+              LevelTier.beginner: 0,
+            },
+          ),
+        );
+        scores.score = Score(total: 4, updatedAt: now);
+
+        final snapshot =
+            (await service.load(DashboardPeriod.week, now: now)).valueOrNull!;
+
+        expect(snapshot.pointsToNextTier, 6);
+      });
+
+      test('elite has no next tier', () async {
+        scores.score = Score(total: 900, updatedAt: now);
+        levels.items.add(status(LevelTier.elite));
+
+        final snapshot =
+            (await service.load(DashboardPeriod.week, now: now)).valueOrNull!;
+
+        expect(snapshot.nextTier, isNull);
+        expect(snapshot.pointsToNextTier, isNull);
+      });
+
+      test('level held back by recent performance shows no gap', () async {
+        // Score would already be disciplined (300+), but the level is
+        // still consistent: 0 or negative points must not be shown.
+        scores.score = Score(total: 350, updatedAt: now);
+        levels.items.add(status(LevelTier.consistent));
+
+        final snapshot =
+            (await service.load(DashboardPeriod.week, now: now)).valueOrNull!;
+
+        expect(snapshot.pointsToNextTier, isNull);
+        expect(snapshot.nextTierProgress, isNull);
+      });
     });
   });
 }

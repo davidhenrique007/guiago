@@ -1,6 +1,8 @@
 import '../../../core/result/result.dart';
 import '../../performance/application/performance_engine.dart';
 import '../../performance/data/occurrence_outcome_mapper.dart';
+import '../../performance/domain/level.dart';
+import '../../performance/domain/level_policy.dart';
 import '../../performance/domain/level_repository.dart';
 import '../../performance/domain/occurrence_outcome.dart';
 import '../../performance/domain/score_repository.dart';
@@ -9,6 +11,7 @@ import '../../tasks/domain/task_occurrence.dart';
 import '../../tasks/domain/task_occurrence_repository.dart';
 import '../domain/dashboard_period.dart';
 import '../domain/dashboard_snapshot.dart';
+import 'next_level_progress.dart';
 import 'trend_engine.dart';
 
 /// Read-only assembler of a [DashboardSnapshot].
@@ -26,7 +29,9 @@ class DashboardService {
     required ScoreRepository scoreRepository,
     required LevelRepository levelRepository,
     required StreakRepository streakRepository,
-  })  : _occurrences = occurrenceRepository,
+    LevelPolicy policy = LevelPolicy.defaultPolicy,
+  })  : _policy = policy,
+        _occurrences = occurrenceRepository,
         _mapper = mapper,
         _performanceEngine = performanceEngine,
         _trendEngine = trendEngine,
@@ -41,6 +46,7 @@ class DashboardService {
   final ScoreRepository _scores;
   final LevelRepository _levels;
   final StreakRepository _streaks;
+  final LevelPolicy _policy;
 
   /// [now] exists only so tests can pin the clock.
   Future<Result<DashboardSnapshot>> load(
@@ -82,6 +88,13 @@ class DashboardService {
       byDay.putIfAbsent(day, () => <OccurrenceOutcome>[]).add(outcome);
     }
 
+    final LevelStatus? level = levelResult.valueOrNull;
+    final NextLevelGap? gap = NextLevelProgress.calculate(
+      current: level?.tier ?? LevelTier.beginner,
+      score: scoreResult.valueOrNull!.total,
+      policy: _policy,
+    );
+
     return Success<DashboardSnapshot>(
       DashboardSnapshot(
         period: period,
@@ -100,8 +113,11 @@ class DashboardService {
           outcomesByDay: byDay,
         ),
         score: scoreResult.valueOrNull!,
-        level: levelResult.valueOrNull,
+        level: level,
         streak: streakResult.valueOrNull,
+        nextTier: gap?.tier,
+        pointsToNextTier: gap?.points,
+        nextTierProgress: gap?.progress,
       ),
     );
   }

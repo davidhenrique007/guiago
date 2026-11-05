@@ -15,9 +15,6 @@ abstract final class AppRoutes {
   static const String home = '/home';
   static const String homeName = 'home';
 
-  static const String dashboard = '/dashboard';
-  static const String dashboardName = 'dashboard';
-
   // Bottom-navigation destinations (besides home).
   static const String tasks = '/tasks';
   static const String tasksName = 'tasks';
@@ -30,6 +27,11 @@ abstract final class AppRoutes {
 
   static const String profile = '/profile';
   static const String profileName = 'profile';
+
+  /// Child route of the Perfil branch (the link to it arrives with the
+  /// Perfil screen).
+  static const String profileInsights = '/profile/insights';
+  static const String profileInsightsName = 'profileInsights';
 
   static const String taskCreate = '/tasks/create';
   static const String taskCreateName = 'taskCreate';

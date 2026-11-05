@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
 
 /// Saudação + data (master spec §22).
@@ -9,31 +10,6 @@ class HomeGreeting extends StatelessWidget {
   final String userName;
   final DateTime today;
 
-  static const List<String> _weekdays = <String>[
-    'segunda-feira',
-    'terça-feira',
-    'quarta-feira',
-    'quinta-feira',
-    'sexta-feira',
-    'sábado',
-    'domingo',
-  ];
-
-  static const List<String> _months = <String>[
-    'janeiro',
-    'fevereiro',
-    'março',
-    'abril',
-    'maio',
-    'junho',
-    'julho',
-    'agosto',
-    'setembro',
-    'outubro',
-    'novembro',
-    'dezembro',
-  ];
-
   String get _period {
     final int hour = DateTime.now().hour;
     if (hour < 12) return 'Bom dia';
@@ -41,14 +17,7 @@ class HomeGreeting extends StatelessWidget {
     return 'Boa noite';
   }
 
-  String get _dateLabel {
-    final String weekday = _weekdays[today.weekday - 1];
-    final String month = _months[today.month - 1];
-    return '${_capitalize(weekday)}, ${today.day} de $month';
-  }
-
-  static String _capitalize(String value) =>
-      '${value[0].toUpperCase()}${value.substring(1)}';
+  String get _dateLabel => PtDateLabels.longDate(today);
 
   @override
   Widget build(BuildContext context) {

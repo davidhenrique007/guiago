@@ -1,0 +1,1490 @@
+﻿
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\application\dashboard_controller.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/errors/failures.dart';
+import '../../../core/result/result.dart';
+import '../data/dashboard_providers.dart';
+import '../domain/dashboard_period.dart';
+import '../domain/dashboard_snapshot.dart';
+
+/// Thrown into the [AsyncValue] when the snapshot cannot be loaded, so
+/// the UI can show the original [failure] in an error state.
+class DashboardLoadException implements Exception {
+  const DashboardLoadException(this.failure);
+
+  final Failure failure;
+
+  @override
+  String toString() => 'DashboardLoadException: ${failure.message}';
+}
+
+/// One controller per [DashboardPeriod] (Riverpod family, same shape
+/// as `AlarmRingController`: the argument arrives via the constructor).
+class DashboardController extends AsyncNotifier<DashboardSnapshot> {
+  DashboardController(this.period);
+
+  final DashboardPeriod period;
+
+  @override
+  Future<DashboardSnapshot> build() async {
+    final Result<DashboardSnapshot> result =
+        await ref.read(dashboardServiceProvider).load(period);
+    return switch (result) {
+      Success<DashboardSnapshot>(:final value) => value,
+      Fail<DashboardSnapshot>(:final failure) =>
+        throw DashboardLoadException(failure),
+    };
+  }
+
+  /// Re-reads everything. The screen calls this when it opens, since
+  /// occurrences may have been resolved since the last load.
+  void refresh() => ref.invalidateSelf();
+}
+
+final dashboardControllerProvider = AsyncNotifierProvider.family<
+    DashboardController, DashboardSnapshot, DashboardPeriod>(
+  DashboardController.new,
+);
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\application\dashboard_providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../performance/data/performance_providers.dart';
+import '../../tasks/data/task_providers.dart';
+import '../application/dashboard_service.dart';
+import '../application/trend_engine.dart';
+
+final Provider<TrendEngine> trendEngineProvider =
+    Provider<TrendEngine>((ref) => const TrendEngine());
+
+final Provider<DashboardService> dashboardServiceProvider =
+    Provider<DashboardService>((ref) {
+  return DashboardService(
+    occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
+    mapper: ref.watch(occurrenceOutcomeMapperProvider),
+    performanceEngine: ref.watch(performanceEngineProvider),
+    trendEngine: ref.watch(trendEngineProvider),
+    scoreRepository: ref.watch(scoreRepositoryProvider),
+    levelRepository: ref.watch(levelRepositoryProvider),
+    streakRepository: ref.watch(streakRepositoryProvider),
+  );
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\application\dashboard_service.dart
+import '../../../core/result/result.dart';
+import '../../performance/application/performance_engine.dart';
+import '../../performance/data/occurrence_outcome_mapper.dart';
+import '../../performance/domain/level_repository.dart';
+import '../../performance/domain/occurrence_outcome.dart';
+import '../../performance/domain/score_repository.dart';
+import '../../performance/domain/streak_repository.dart';
+import '../../tasks/domain/task_occurrence.dart';
+import '../../tasks/domain/task_occurrence_repository.dart';
+import '../domain/dashboard_period.dart';
+import '../domain/dashboard_snapshot.dart';
+import 'trend_engine.dart';
+
+/// Read-only assembler of a [DashboardSnapshot].
+///
+/// Period metrics and the trend are computed in memory from the
+/// occurrences of the period; Score, Level and Streak are read from
+/// what `PerformanceController` already persisted. Opening the
+/// dashboard therefore never writes to the database.
+class DashboardService {
+  DashboardService({
+    required TaskOccurrenceRepository occurrenceRepository,
+    required OccurrenceOutcomeMapper mapper,
+    required PerformanceEngine performanceEngine,
+    required TrendEngine trendEngine,
+    required ScoreRepository scoreRepository,
+    required LevelRepository levelRepository,
+    required StreakRepository streakRepository,
+  })  : _occurrences = occurrenceRepository,
+        _mapper = mapper,
+        _performanceEngine = performanceEngine,
+        _trendEngine = trendEngine,
+        _scores = scoreRepository,
+        _levels = levelRepository,
+        _streaks = streakRepository;
+
+  final TaskOccurrenceRepository _occurrences;
+  final OccurrenceOutcomeMapper _mapper;
+  final PerformanceEngine _performanceEngine;
+  final TrendEngine _trendEngine;
+  final ScoreRepository _scores;
+  final LevelRepository _levels;
+  final StreakRepository _streaks;
+
+  /// [now] exists only so tests can pin the clock.
+  Future<Result<DashboardSnapshot>> load(
+    DashboardPeriod period, {
+    DateTime? now,
+  }) async {
+    final DateTime clock = now ?? DateTime.now();
+    final DashboardRange range = period.rangeAt(clock);
+
+    final occurrencesResult =
+        await _occurrences.getOccurrencesInRange(range.start, range.end);
+    if (occurrencesResult.isFailure) {
+      return Fail<DashboardSnapshot>(occurrencesResult.failureOrNull!);
+    }
+
+    final scoreResult = await _scores.getScore();
+    if (scoreResult.isFailure) {
+      return Fail<DashboardSnapshot>(scoreResult.failureOrNull!);
+    }
+    final levelResult = await _levels.getLatest();
+    if (levelResult.isFailure) {
+      return Fail<DashboardSnapshot>(levelResult.failureOrNull!);
+    }
+    final streakResult = await _streaks.getStatus();
+    if (streakResult.isFailure) {
+      return Fail<DashboardSnapshot>(streakResult.failureOrNull!);
+    }
+
+    final Map<DateTime, List<OccurrenceOutcome>> byDay =
+        <DateTime, List<OccurrenceOutcome>>{};
+    for (final TaskOccurrence occurrence in occurrencesResult.valueOrNull!) {
+      final OccurrenceOutcome? outcome = _mapper.toOutcome(occurrence);
+      if (outcome == null) continue; // not finished, or cancelled
+      final DateTime day = DateTime(
+        occurrence.scheduledAt.year,
+        occurrence.scheduledAt.month,
+        occurrence.scheduledAt.day,
+      );
+      byDay.putIfAbsent(day, () => <OccurrenceOutcome>[]).add(outcome);
+    }
+
+    return Success<DashboardSnapshot>(
+      DashboardSnapshot(
+        period: period,
+        rangeStart: range.start,
+        rangeEnd: range.end,
+        performance: _performanceEngine.calculate(
+          id: 'dashboard-${period.name}',
+          periodStart: range.start,
+          periodEnd: range.end,
+          outcomes: byDay.values.expand((l) => l).toList(),
+          calculatedAt: clock,
+        ),
+        trend: _trendEngine.calculate(
+          rangeStart: range.start,
+          rangeEnd: range.end,
+          outcomesByDay: byDay,
+        ),
+        score: scoreResult.valueOrNull!,
+        level: levelResult.valueOrNull,
+        streak: streakResult.valueOrNull,
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\application\trend_engine.dart
+import '../../performance/domain/occurrence_outcome.dart';
+import '../domain/trend_point.dart';
+
+/// Pure: turns finished occurrences, grouped by local day, into one
+/// [TrendPoint] per day of the range (days without occurrences get a
+/// zeroed point, so the chart never has holes).
+class TrendEngine {
+  const TrendEngine();
+
+  /// [outcomesByDay] keys must be local dates normalized to midnight.
+  List<TrendPoint> calculate({
+    required DateTime rangeStart,
+    required DateTime rangeEnd,
+    required Map<DateTime, List<OccurrenceOutcome>> outcomesByDay,
+  }) {
+    final List<TrendPoint> points = <TrendPoint>[];
+    final DateTime last = DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day);
+
+    for (var day = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+        !day.isAfter(last);
+        day = DateTime(day.year, day.month, day.day + 1)) {
+      final List<OccurrenceOutcome> outcomes =
+          outcomesByDay[day] ?? const <OccurrenceOutcome>[];
+      points.add(
+        TrendPoint(
+          day: day,
+          total: outcomes.length,
+          completed:
+              outcomes.where((o) => o.status == OutcomeStatus.completed).length,
+        ),
+      );
+    }
+    return points;
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\data\dashboard_providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../performance/data/performance_providers.dart';
+import '../../tasks/data/task_providers.dart';
+import '../application/dashboard_service.dart';
+import '../application/trend_engine.dart';
+
+final Provider<TrendEngine> trendEngineProvider =
+    Provider<TrendEngine>((ref) => const TrendEngine());
+
+final Provider<DashboardService> dashboardServiceProvider =
+    Provider<DashboardService>((ref) {
+  return DashboardService(
+    occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
+    mapper: ref.watch(occurrenceOutcomeMapperProvider),
+    performanceEngine: ref.watch(performanceEngineProvider),
+    trendEngine: ref.watch(trendEngineProvider),
+    scoreRepository: ref.watch(scoreRepositoryProvider),
+    levelRepository: ref.watch(levelRepositoryProvider),
+    streakRepository: ref.watch(streakRepositoryProvider),
+  );
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\domain\dashboard_period.dart
+/// Rolling window shown by the dashboard: today, the last 7 days or
+/// the last 30 days (ending today). Rolling windows avoid depending on
+/// which weekday the week starts on.
+enum DashboardPeriod { today, week, month }
+
+/// Inclusive local-time range covered by a [DashboardPeriod].
+typedef DashboardRange = ({DateTime start, DateTime end});
+
+extension DashboardPeriodX on DashboardPeriod {
+  int get days => switch (this) {
+        DashboardPeriod.today => 1,
+        DashboardPeriod.week => 7,
+        DashboardPeriod.month => 30,
+      };
+
+  /// The range that ends at the last instant of [now]'s local day and
+  /// starts at midnight, [days] - 1 days earlier. Uses calendar
+  /// arithmetic (not `Duration`) so daylight-saving changes cannot
+  /// shift the boundaries.
+  DashboardRange rangeAt(DateTime now) {
+    final DateTime start = DateTime(now.year, now.month, now.day - (days - 1));
+    final DateTime end = DateTime(now.year, now.month, now.day + 1)
+        .subtract(const Duration(microseconds: 1));
+    return (start: start, end: end);
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\domain\dashboard_snapshot.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import '../../performance/domain/level.dart';
+import '../../performance/domain/performance_record.dart';
+import '../../performance/domain/score.dart';
+import '../../performance/domain/streak_status.dart';
+import 'dashboard_period.dart';
+import 'trend_point.dart';
+
+part 'dashboard_snapshot.freezed.dart';
+
+/// Everything the dashboard screen needs for one [period], already
+/// calculated — the UI never computes metrics (master spec §3, Fase 6).
+@freezed
+sealed class DashboardSnapshot with _$DashboardSnapshot {
+  const factory DashboardSnapshot({
+    required DashboardPeriod period,
+    required DateTime rangeStart,
+    required DateTime rangeEnd,
+
+    /// Metrics for the period, computed in memory (never persisted).
+    required PerformanceRecord performance,
+
+    /// One point per day of the period, zero-filled.
+    required List<TrendPoint> trend,
+
+    /// Persisted, all-time values.
+    required Score score,
+    LevelStatus? level,
+    StreakStatus? streak,
+  }) = _DashboardSnapshot;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\domain\trend_point.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'trend_point.freezed.dart';
+
+/// One day of the dashboard trend chart: how many occurrences ended
+/// that day and how many of them were completed.
+@freezed
+sealed class TrendPoint with _$TrendPoint {
+  const factory TrendPoint({
+    /// Local date, normalized to midnight.
+    required DateTime day,
+    required int total,
+    required int completed,
+  }) = _TrendPoint;
+
+  const TrendPoint._();
+
+  bool get hasData => total > 0;
+
+  /// 0.0 when there was nothing to complete that day.
+  double get completionRate => total == 0 ? 0 : completed / total;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\presentation\screens\dashboard_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../application/dashboard_controller.dart';
+import '../../domain/dashboard_period.dart';
+import '../../domain/dashboard_snapshot.dart';
+import '../widgets/dashboard_metrics_grid.dart';
+import '../widgets/dashboard_period_selector.dart';
+import '../widgets/dashboard_trend_section.dart';
+
+/// The Dashboard (master spec §6/§22): Score, Nível, Streak and
+/// Completion Rate for a rolling Hoje/Semana/Mês window, plus a
+/// trend chart. Purely a view over what [DashboardController] loads
+/// — this screen never computes a metric itself (§6: "a UI não deve
+/// calcular métricas").
+class DashboardScreen extends ConsumerStatefulWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  DashboardPeriod _period = DashboardPeriod.today;
+
+  @override
+  Widget build(BuildContext context) {
+    final AsyncValue<DashboardSnapshot> snapshotAsync = ref.watch(
+      dashboardControllerProvider(_period),
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: Text('Desempenho', style: AppTypography.titleLarge),
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            ref.read(dashboardControllerProvider(_period).notifier).refresh();
+            await ref.read(dashboardControllerProvider(_period).future);
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: <Widget>[
+              DashboardPeriodSelector(
+                selected: _period,
+                onChanged: (DashboardPeriod period) {
+                  setState(() => _period = period);
+                },
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              // Pattern-matching, not `.when()` — same convention as
+              // AlarmRingController (AsyncValue.valueOrNull was
+              // removed in Riverpod 3.0; see its comment on
+              // `_currentState`).
+              switch (snapshotAsync) {
+                AsyncData<DashboardSnapshot>(:final value) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      DashboardMetricsGrid(snapshot: value),
+                      const SizedBox(height: AppSpacing.lg),
+                      DashboardTrendSection(snapshot: value),
+                    ],
+                  ),
+                AsyncError<DashboardSnapshot>() => Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxl,
+                    ),
+                    child: AppErrorState(
+                      message: 'Não foi possível carregar o desempenho.',
+                      onRetry: () => ref
+                          .read(dashboardControllerProvider(_period).notifier)
+                          .refresh(),
+                    ),
+                  ),
+                _ => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                    child: AppLoadingState(),
+                  ),
+              },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\application\home_controller.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/errors/failures.dart';
+import '../../../core/result/result.dart';
+import '../data/home_providers.dart';
+import '../domain/home_snapshot.dart';
+
+/// Thrown into the [AsyncValue] when the snapshot cannot be loaded,
+/// so the UI can show the original [failure] in an error state.
+class HomeLoadException implements Exception {
+  const HomeLoadException(this.failure);
+
+  final Failure failure;
+
+  @override
+  String toString() => 'HomeLoadException: ${failure.message}';
+}
+
+class HomeController extends AsyncNotifier<HomeSnapshot> {
+  @override
+  Future<HomeSnapshot> build() async {
+    final Result<HomeSnapshot> result =
+        await ref.read(homeServiceProvider).load();
+    return switch (result) {
+      Success<HomeSnapshot>(:final value) => value,
+      Fail<HomeSnapshot>(:final failure) => throw HomeLoadException(failure),
+    };
+  }
+
+  /// The screen calls this on pull-to-refresh, since occurrences may
+  /// have resolved since the last load.
+  void refresh() => ref.invalidateSelf();
+}
+
+final homeControllerProvider =
+    AsyncNotifierProvider<HomeController, HomeSnapshot>(HomeController.new);
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\application\home_service.dart
+import '../../../core/result/result.dart';
+import '../../onboarding/domain/settings_repository.dart';
+import '../../tasks/domain/occurrence_status.dart';
+import '../../tasks/domain/task.dart';
+import '../../tasks/domain/task_occurrence.dart';
+import '../../tasks/domain/task_occurrence_repository.dart';
+import '../../tasks/domain/task_repository.dart';
+import '../domain/home_snapshot.dart';
+import '../domain/today_task_item.dart';
+
+/// Read-only assembler of a [HomeSnapshot] — same shape as
+/// DashboardService (Fase 6B): never writes, only reads and joins
+/// what other features already persisted.
+class HomeService {
+  HomeService({
+    required TaskOccurrenceRepository occurrenceRepository,
+    required TaskRepository taskRepository,
+    required SettingsRepository settingsRepository,
+  })  : _occurrences = occurrenceRepository,
+        _tasks = taskRepository,
+        _settings = settingsRepository;
+
+  final TaskOccurrenceRepository _occurrences;
+  final TaskRepository _tasks;
+  final SettingsRepository _settings;
+
+  /// [now] exists only so tests can pin the clock.
+  Future<Result<HomeSnapshot>> load({DateTime? now}) async {
+    final DateTime clock = now ?? DateTime.now();
+    final DateTime dayStart = DateTime(clock.year, clock.month, clock.day);
+    final DateTime dayEnd = DateTime(clock.year, clock.month, clock.day + 1)
+        .subtract(const Duration(microseconds: 1));
+
+    final settingsResult = await _settings.getSettings();
+    if (settingsResult.isFailure) {
+      return Fail<HomeSnapshot>(settingsResult.failureOrNull!);
+    }
+
+    final occurrencesResult = await _occurrences.getOccurrencesInRange(
+      dayStart,
+      dayEnd,
+    );
+    if (occurrencesResult.isFailure) {
+      return Fail<HomeSnapshot>(occurrencesResult.failureOrNull!);
+    }
+
+    final List<TaskOccurrence> occurrences = occurrencesResult.valueOrNull!
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+    final List<TodayTaskItem> items = <TodayTaskItem>[];
+    for (final TaskOccurrence occurrence in occurrences) {
+      // Cancelled occurrences (task deleted/archived) don't belong on
+      // the Home list — same rule as the Fase 5 mapper.
+      if (occurrence.status == OccurrenceStatus.cancelled) continue;
+
+      final taskResult = await _tasks.getTask(occurrence.taskId);
+      if (taskResult.isFailure) {
+        return Fail<HomeSnapshot>(taskResult.failureOrNull!);
+      }
+      final Task? task = taskResult.valueOrNull;
+      if (task == null) continue; // task deleted after being scheduled
+
+      items.add(
+        TodayTaskItem(
+          occurrenceId: occurrence.id,
+          taskId: task.id,
+          title: task.title,
+          priority: task.priority,
+          scheduledAt: occurrence.scheduledAt,
+          status: occurrence.status,
+        ),
+      );
+    }
+
+    TodayTaskItem? next;
+    for (final TodayTaskItem item in items) {
+      if (!item.isResolved) {
+        next = item;
+        break;
+      }
+    }
+
+    return Success<HomeSnapshot>(
+      HomeSnapshot(
+        userName: settingsResult.valueOrNull!.userName,
+        today: dayStart,
+        todayTasks: items,
+        nextTask: next,
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\data\home_providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../onboarding/data/settings_repository_provider.dart';
+import '../../tasks/data/task_providers.dart';
+import '../application/home_service.dart';
+
+final Provider<HomeService> homeServiceProvider = Provider<HomeService>((
+  ref,
+) {
+  return HomeService(
+    occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
+    taskRepository: ref.watch(taskRepositoryProvider),
+    settingsRepository: ref.watch(settingsRepositoryProvider),
+  );
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\domain\home_snapshot.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import '../../tasks/domain/occurrence_status.dart';
+import 'today_task_item.dart';
+
+part 'home_snapshot.freezed.dart';
+
+/// Everything the Home screen needs, already computed (master spec
+/// §22: "Qual é a próxima coisa importante que preciso de fazer?").
+/// The UI never computes this itself.
+@freezed
+sealed class HomeSnapshot with _$HomeSnapshot {
+  const factory HomeSnapshot({
+    required String userName,
+    required DateTime today,
+    required List<TodayTaskItem> todayTasks,
+
+    /// The first not-yet-resolved item in [todayTasks] by
+    /// scheduledAt, or null if everything today is resolved (or
+    /// there's nothing scheduled).
+    TodayTaskItem? nextTask,
+  }) = _HomeSnapshot;
+
+  const HomeSnapshot._();
+
+  int get totalCount => todayTasks.length;
+
+  int get completedCount =>
+      todayTasks.where((t) => t.status == OccurrenceStatus.completed).length;
+
+  bool get hasTasksToday => totalCount > 0;
+
+  /// 0.0–1.0. 0 when nothing is scheduled today.
+  double get progress => totalCount == 0 ? 0 : completedCount / totalCount;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\domain\today_task_item.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import '../../tasks/domain/occurrence_status.dart';
+import '../../tasks/domain/task_priority.dart';
+
+part 'today_task_item.freezed.dart';
+
+/// One of today's occurrences, already joined with its Task's title
+/// and priority — the Home screen never looks up a Task itself
+/// (master spec §5: UI doesn't touch repositories directly).
+@freezed
+sealed class TodayTaskItem with _$TodayTaskItem {
+  const factory TodayTaskItem({
+    required String occurrenceId,
+    required String taskId,
+    required String title,
+    required TaskPriority priority,
+    required DateTime scheduledAt,
+    required OccurrenceStatus status,
+  }) = _TodayTaskItem;
+
+  const TodayTaskItem._();
+
+  bool get isResolved =>
+      status == OccurrenceStatus.completed ||
+      status == OccurrenceStatus.declined ||
+      status == OccurrenceStatus.missed ||
+      status == OccurrenceStatus.cancelled;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\presentation\screens\home_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../app/router/app_router.dart';
+import '../../../../design_system/design_system.dart';
+import '../../application/home_controller.dart';
+import '../../domain/home_snapshot.dart';
+import '../widgets/home_greeting.dart';
+import '../widgets/home_next_task_card.dart';
+import '../widgets/home_progress_card.dart';
+import '../widgets/home_today_list.dart';
+
+/// The Home (master spec §22) — the app's hub: greeting, today's
+/// progress, the next pending task, and the rest of today's list.
+/// Purely a view over what [HomeController] loads.
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<HomeSnapshot> snapshotAsync = ref.watch(
+      homeControllerProvider,
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: 'Desempenho',
+            onPressed: () => context.pushNamed(AppRoutes.dashboardName),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.primary,
+        tooltip: 'Nova tarefa',
+        onPressed: () async {
+          await context.pushNamed(AppRoutes.taskCreateName);
+          // A tarefa criada pode ter ficado para hoje — recarrega.
+          ref.read(homeControllerProvider.notifier).refresh();
+        },
+        child: const Icon(Icons.add, color: AppColors.textOnPrimary),
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            ref.read(homeControllerProvider.notifier).refresh();
+            await ref.read(homeControllerProvider.future);
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: <Widget>[
+              // Pattern-matching, not `.when()` — same convention as
+              // AlarmRingController / DashboardScreen.
+              switch (snapshotAsync) {
+                AsyncData<HomeSnapshot>(:final value) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      HomeGreeting(
+                        userName: value.userName,
+                        today: value.today,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      HomeProgressCard(snapshot: value),
+                      const SizedBox(height: AppSpacing.md),
+                      HomeNextTaskCard(nextTask: value.nextTask),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text('Hoje', style: AppTypography.titleMedium),
+                      const SizedBox(height: AppSpacing.sm),
+                      HomeTodayList(items: value.todayTasks),
+                    ],
+                  ),
+                AsyncError<HomeSnapshot>() => Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxl,
+                    ),
+                    child: AppErrorState(
+                      message: 'Não foi possível carregar a tua Home.',
+                      onRetry: () =>
+                          ref.read(homeControllerProvider.notifier).refresh(),
+                    ),
+                  ),
+                _ => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                    child: AppLoadingState(),
+                  ),
+              },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\day_outcome.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// DayOutcome
+//
+// DEFINIÇÃO DE "DIA CUMPRIDO" (secção 21 exige documentar isto —
+// formalizar em docs/adr/ADR-007-streak-definition.md):
+//
+//   fulfilled — houve pelo menos 1 ocorrência agendada nesse dia
+//               E todas terminaram em COMPLETED.
+//   broken    — houve pelo menos 1 ocorrência agendada nesse dia
+//               E pelo menos uma terminou em MISSED ou DECLINED.
+//   neutral   — não havia nenhuma ocorrência agendada nesse dia.
+//               Não quebra nem estende a sequência (dias "livres"
+//               não penalizam o streak).
+//
+// O dia corrente (hoje), enquanto ainda tiver ocorrências por
+// resolver, não deve ser mapeado como "broken" prematuramente —
+// isso é responsabilidade de quem constrói a lista de DayOutcome
+// (mapper/Repository na camada de Data), não deste modelo.
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'day_outcome.freezed.dart';
+
+enum DayFulfillment { fulfilled, neutral, broken }
+
+@freezed
+sealed class DayOutcome with _$DayOutcome {
+  const factory DayOutcome({
+    /// Data normalizada à meia-noite local (sem componente de hora).
+    required DateTime date,
+    required DayFulfillment fulfillment,
+  }) = _DayOutcome;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\level.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Entidades de domínio: LevelTier, LevelStatus
+//
+// Ver secção 20 da master spec: o nível não depende apenas do
+// score histórico — o LevelEngine deve considerar desempenho
+// recente. Esta entidade é só o resultado dessa avaliação, não
+// a lógica em si.
+//
+// Sem userId: app é single-user local. Tem `id` (ao contrário de
+// Score/StreakStatus) porque é histórico multi-linha, não um
+// agregado singleton — cada avaliação gera uma linha própria.
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'level.freezed.dart';
+
+enum LevelTier {
+  beginner,
+  consistent,
+  disciplined,
+  elite,
+}
+
+extension LevelTierOrder on LevelTier {
+  /// Posição ordinal, útil para comparar/detectar subida ou descida.
+  int get rank => LevelTier.values.indexOf(this);
+
+  bool isAbove(LevelTier other) => rank > other.rank;
+  bool isBelow(LevelTier other) => rank < other.rank;
+}
+
+@freezed
+sealed class LevelStatus with _$LevelStatus {
+  const factory LevelStatus({
+    required String id,
+    required LevelTier tier,
+    required LevelTier previousTier,
+    required int scoreAtEvaluation,
+    required DateTime evaluatedAt,
+  }) = _LevelStatus;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\level_policy.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// LevelPolicy
+//
+// Valores por defeito, arbitrários — ajusta livremente. Formaliza
+// a versão final em docs/adr (mesmo espírito da ScoringPolicy,
+// secção 19: nunca espalhar estes números pelo código).
+//
+// Regra (secção 20): o nível não depende só do score histórico.
+// `recentCompletionRateFloor` é o mecanismo que faz isso — se a
+// completionRate recente cair abaixo disto, o tier é limitado a
+// um nível abaixo do que o score, sozinho, indicaria.
+
+import 'level.dart';
+
+class LevelPolicy {
+  const LevelPolicy({
+    this.scoreThresholds = const {
+      LevelTier.elite: 700,
+      LevelTier.disciplined: 300,
+      LevelTier.consistent: 100,
+      LevelTier.beginner: 0,
+    },
+    this.recentCompletionRateFloor = 0.5,
+  });
+
+  final Map<LevelTier, int> scoreThresholds;
+  final double recentCompletionRateFloor;
+
+  static const LevelPolicy defaultPolicy = LevelPolicy();
+
+  LevelTier tierForScore(int score) {
+    if (score >= scoreThresholds[LevelTier.elite]!) return LevelTier.elite;
+    if (score >= scoreThresholds[LevelTier.disciplined]!) {
+      return LevelTier.disciplined;
+    }
+    if (score >= scoreThresholds[LevelTier.consistent]!) {
+      return LevelTier.consistent;
+    }
+    return LevelTier.beginner;
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\level_repository.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Interface de repositório do Level (histórico de avaliações).
+
+import '../../../core/result/result.dart';
+import 'level.dart';
+
+abstract interface class LevelRepository {
+  /// Insere uma nova avaliação (histórico append-only).
+  Future<Result<LevelStatus>> saveEvaluation(LevelStatus status);
+
+  /// A avaliação mais recente, ou null se ainda não houver nenhuma.
+  Future<Result<LevelStatus?>> getLatest();
+
+  Future<Result<List<LevelStatus>>> getHistory();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\occurrence_outcome.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// OccurrenceOutcome
+//
+// Input mínimo de que o PerformanceEngine e o ScoreEngine
+// precisam, desacoplado da entidade TaskOccurrence concreta da
+// feature "tasks". O domínio desta fase não deve importar outra
+// feature diretamente — quem faz o mapeamento
+// TaskOccurrence -> OccurrenceOutcome é o mapper na camada de
+// Data (ver data/mappers/), que já conhece as duas features.
+//
+// Só ocorrências TERMINADAS entram aqui: COMPLETED, MISSED,
+// DECLINED. Ocorrências CANCELLED (tarefa apagada/arquivada
+// antes do prazo) não devem ser mapeadas — não contam para
+// desempenho nem pontuação.
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'occurrence_outcome.freezed.dart';
+
+enum OutcomeStatus { completed, missed, declined }
+
+@freezed
+sealed class OccurrenceOutcome with _$OccurrenceOutcome {
+  const factory OccurrenceOutcome({
+    required String occurrenceId,
+    required OutcomeStatus status,
+    required int snoozeCount,
+
+    /// Tempo entre TRIGGERED e a ação final do utilizador.
+    /// Null se não houver registo (ex.: MISSED sem interação).
+    Duration? responseTime,
+  }) = _OccurrenceOutcome;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\performance_record.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Entidade de domínio: PerformanceRecord
+//
+// Representa o resultado agregado de desempenho do utilizador
+// para uma janela de tempo (ex.: dia, semana, mês).
+//
+// Esta entidade é o OUTPUT do PerformanceEngine (ver secção 18
+// da master spec). Não contém lógica de cálculo — é um valor
+// imutável, puro, sem dependências de Flutter, SQLite ou IA.
+//
+// Sem userId: app é single-user local (mesmo padrão de Task,
+// TaskOccurrence e AlarmRecord no schema real).
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'performance_record.freezed.dart';
+
+@freezed
+sealed class PerformanceRecord with _$PerformanceRecord {
+  const PerformanceRecord._();
+
+  const factory PerformanceRecord({
+    required String id,
+
+    /// Janela temporal a que este registo se refere.
+    required DateTime periodStart,
+    required DateTime periodEnd,
+
+    /// Contagens brutas (fonte de verdade para as taxas abaixo).
+    required int totalOccurrences,
+    required int completedCount,
+    required int completedAfterSnoozeCount,
+    required int missedCount,
+    required int declinedCount,
+    required int snoozedCount,
+
+    /// Taxas derivadas, sempre no intervalo [0.0, 1.0].
+    required double completionRate,
+    required double missRate,
+    required double snoozeRate,
+
+    /// Tempo médio de resposta entre o disparo do alarme (TRIGGERED)
+    /// e a ação do utilizador (COMPLETED/SNOOZED/DECLINED).
+    /// Null quando não há ocorrências com resposta registada.
+    Duration? averageResponseTime,
+    required DateTime calculatedAt,
+  }) = _PerformanceRecord;
+
+  /// Verdadeiro se não houve nenhuma ocorrência nesta janela —
+  /// útil para a UI decidir entre AppEmptyState e os dados reais.
+  bool get isEmpty => totalOccurrences == 0;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\performance_record_repository.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Interface de repositório (secção 5: Domain não pode depender
+// de SQLite/Drift — só a implementação em data/ conhece isso).
+
+import '../../../core/result/result.dart';
+import 'performance_record.dart';
+
+abstract interface class PerformanceRecordRepository {
+  Future<Result<PerformanceRecord>> saveRecord(PerformanceRecord record);
+
+  Future<Result<List<PerformanceRecord>>> getRecordsInRange(
+    DateTime periodStart,
+    DateTime periodEnd,
+  );
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\score.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Entidades de domínio: ScoringReason, ScoreEntry, Score
+//
+// Modelo em estilo "event ledger": cada ação pontuável gera um
+// ScoreEntry imutável (auditável, nunca editado). O Score é o
+// agregado (total corrente), reconstruível a partir dos entries.
+// Consistente com o padrão já usado em TaskEvent (Fase 2).
+//
+// Sem userId: app é single-user local. Score é um agregado único
+// (single-row na tabela, mesmo padrão do SettingsTable).
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'score.freezed.dart';
+
+/// Motivo pelo qual uma ocorrência gerou pontos.
+///
+/// Nota: `completedAfterSnooze` não é um estado da máquina de
+/// estados (secção 11) — é derivado quando uma TaskOccurrence
+/// termina em COMPLETED mas com snoozeCount > 0. Essa derivação
+/// é responsabilidade do ScoreEngine, não desta entidade.
+enum ScoringReason {
+  completed,
+  completedAfterSnooze,
+  missed,
+  declined,
+}
+
+@freezed
+sealed class ScoreEntry with _$ScoreEntry {
+  const factory ScoreEntry({
+    required String id,
+    required String occurrenceId,
+    required ScoringReason reason,
+    required int points,
+    required DateTime occurredAt,
+  }) = _ScoreEntry;
+}
+
+@freezed
+sealed class Score with _$Score {
+  const Score._();
+
+  const factory Score({
+    required int total,
+    required DateTime updatedAt,
+  }) = _Score;
+
+  Score applyEntry(ScoreEntry entry) {
+    return copyWith(
+      total: total + entry.points,
+      updatedAt: entry.occurredAt,
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\score_repository.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Interface de repositório do Score (agregado + ledger).
+
+import '../../../core/result/result.dart';
+import 'score.dart';
+
+abstract interface class ScoreRepository {
+  /// Devolve o agregado atual. Se ainda não houver nenhum score
+  /// persistido, devolve Score(total: 0) — nunca null.
+  Future<Result<Score>> getScore();
+
+  Future<Result<void>> saveScore(Score score);
+
+  /// Insere uma entry no ledger (append-only, nunca update).
+  Future<Result<ScoreEntry>> saveEntry(ScoreEntry entry);
+
+  /// Todo o ledger, em ordem cronológica ascendente. Usado para
+  /// recomputar o agregado quando necessário.
+  Future<Result<List<ScoreEntry>>> getEntries();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\scoring_policy.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// ScoringPolicy (secção 19 da master spec)
+//
+// "Nunca espalhar números pelo código." Toda a pontuação passa
+// por esta política única, facilmente alterável sem tocar no
+// ScoreEngine.
+
+import 'score.dart';
+
+class ScoringPolicy {
+  const ScoringPolicy({
+    this.points = const {
+      ScoringReason.completed: 10,
+      ScoringReason.completedAfterSnooze: 5,
+      ScoringReason.missed: -5,
+      ScoringReason.declined: -5,
+    },
+  });
+
+  final Map<ScoringReason, int> points;
+
+  int pointsFor(ScoringReason reason) => points[reason] ?? 0;
+
+  static const ScoringPolicy defaultPolicy = ScoringPolicy();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\streak_repository.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Interface de repositório do StreakStatus (agregado single-row).
+
+import '../../../core/result/result.dart';
+import 'streak_status.dart';
+
+abstract interface class StreakRepository {
+  Future<Result<void>> saveStatus(StreakStatus status);
+
+  /// null se o streak ainda não tiver sido calculado nenhuma vez.
+  Future<Result<StreakStatus?>> getStatus();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\domain\streak_status.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Entidade de domínio: StreakStatus (secção 21 da master spec)
+//
+// Sem userId: app é single-user local.
+
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'streak_status.freezed.dart';
+
+@freezed
+sealed class StreakStatus with _$StreakStatus {
+  const factory StreakStatus({
+    required int currentStreak,
+    required int longestStreak,
+    DateTime? lastFulfilledDate,
+    required DateTime calculatedAt,
+  }) = _StreakStatus;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\alarm_scheduler.dart
+import '../../../core/result/result.dart';
+import 'task_occurrence.dart';
+
+/// Domain-facing contract the Task Engine uses to keep native alarms
+/// in sync with occurrence lifecycle changes (master spec §13).
+///
+/// Defined here (in `tasks/domain`, the consumer) rather than in
+/// `features/scheduler`, so `TaskEngine` never has to import the
+/// scheduler feature — only `SchedulerEngine` (in
+/// `features/scheduler/application`) imports this interface, to
+/// implement it. That keeps the dependency one-directional:
+/// scheduler → tasks, never tasks → scheduler.
+abstract interface class AlarmScheduler {
+  Future<Result<void>> scheduleOccurrence(TaskOccurrence occurrence);
+
+  Future<Result<void>> cancelOccurrence(String occurrenceId);
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\occurrence_outcome_recorder.dart
+// GuiaGo — hook opcional para a Fase 5 (Performance/Gamification)
+//
+// Mesmo padrão de dependency-inversion do AlarmScheduler (ADR-006):
+// tasks/ define a interface, outra feature implementa-a, e o
+// TaskEngine chama-a sem nunca importar essa feature diretamente.
+//
+// Best-effort por desenho: implementações NUNCA devem lançar —
+// o TaskEngine não bloqueia nem falha a operação principal por
+// causa disto (ver chamada em _resolveOccurrence).
+
+import 'task_occurrence.dart';
+
+abstract interface class OccurrenceOutcomeRecorder {
+  Future<void> onOccurrenceResolved(TaskOccurrence occurrence);
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\occurrence_state_machine.dart
+import '../../../core/errors/failures.dart';
+import '../../../core/result/result.dart';
+import 'occurrence_status.dart';
+
+/// Validates and applies [OccurrenceStatus] transitions (master spec
+/// §11). Independent of UI and persistence — a pure function of
+/// (current status, requested status).
+///
+/// `cancelled` is reachable from `scheduled` and `snoozed` (e.g. the
+/// parent task gets archived/deleted) even though master spec §11's
+/// transition list doesn't spell it out explicitly — otherwise
+/// `cancelled` would be a status nothing could ever reach.
+abstract final class OccurrenceStateMachine {
+  static const Map<OccurrenceStatus, Set<OccurrenceStatus>> _validTransitions =
+      <OccurrenceStatus, Set<OccurrenceStatus>>{
+    OccurrenceStatus.scheduled: <OccurrenceStatus>{
+      OccurrenceStatus.triggered,
+      OccurrenceStatus.cancelled,
+    },
+    OccurrenceStatus.triggered: <OccurrenceStatus>{
+      OccurrenceStatus.completed,
+      OccurrenceStatus.snoozed,
+      OccurrenceStatus.declined,
+      OccurrenceStatus.missed,
+    },
+    OccurrenceStatus.snoozed: <OccurrenceStatus>{
+      OccurrenceStatus.scheduled,
+      OccurrenceStatus.cancelled,
+    },
+    OccurrenceStatus.completed: <OccurrenceStatus>{},
+    OccurrenceStatus.declined: <OccurrenceStatus>{},
+    OccurrenceStatus.missed: <OccurrenceStatus>{},
+    OccurrenceStatus.cancelled: <OccurrenceStatus>{},
+  };
+
+  /// Whether the domain allows moving from [from] to [to] directly.
+  static bool canTransition(OccurrenceStatus from, OccurrenceStatus to) =>
+      _validTransitions[from]?.contains(to) ?? false;
+
+  /// The terminal (no further transitions possible) statuses.
+  static bool isTerminal(OccurrenceStatus status) =>
+      _validTransitions[status]?.isEmpty ?? true;
+
+  /// Returns [to] wrapped in [Success] if the transition is valid,
+  /// or a [SchedulingFailure] if not.
+  static Result<OccurrenceStatus> transition(
+    OccurrenceStatus from,
+    OccurrenceStatus to,
+  ) {
+    if (!canTransition(from, to)) {
+      return Fail<OccurrenceStatus>(
+        SchedulingFailure('Invalid occurrence transition: $from -> $to'),
+      );
+    }
+    return Success<OccurrenceStatus>(to);
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\occurrence_status.dart
+/// A [TaskOccurrence]'s lifecycle state (master spec §11).
+///
+/// Transitions between these are only ever made through
+/// [OccurrenceStateMachine] — never assigned directly by UI or
+/// repository code.
+enum OccurrenceStatus {
+  scheduled,
+  triggered,
+  snoozed,
+  completed,
+  declined,
+  missed,
+  cancelled,
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\recurrence_engine.dart
+import 'recurrence_rule.dart';
+
+/// Computes the next occurrence date/time for a recurring [Task]
+/// (master spec §12).
+///
+/// Deliberately generates ONE occurrence at a time — call this again
+/// only after the current occurrence resolves (completed / declined
+/// / missed). Never pre-generates a batch, so there is no risk of
+/// runaway occurrence generation.
+abstract final class RecurrenceEngine {
+  /// Returns the next scheduled date/time strictly after [after],
+  /// preserving the time-of-day and (for `weekly`) the weekday from
+  /// [anchor] — the task's original scheduled time. Returns `null`
+  /// for [RecurrenceRule.none] (a one-off task has no next
+  /// occurrence).
+  static DateTime? nextOccurrenceAfter({
+    required RecurrenceRule recurrenceRule,
+    required DateTime anchor,
+    required DateTime after,
+  }) {
+    return switch (recurrenceRule) {
+      RecurrenceNone() => null,
+      RecurrenceDaily() => _nextDaily(anchor, after),
+      RecurrenceWeekly() =>
+        _nextOnWeekdays(<int>{anchor.weekday}, anchor, after),
+      RecurrenceCustomDays(:final weekdays) =>
+        _nextOnWeekdays(weekdays, anchor, after),
+    };
+  }
+
+  static DateTime _nextDaily(DateTime anchor, DateTime after) {
+    DateTime candidate = _atTimeOfDay(after, anchor);
+    if (!candidate.isAfter(after)) {
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    return candidate;
+  }
+
+  static DateTime _nextOnWeekdays(
+    Set<int> weekdays,
+    DateTime anchor,
+    DateTime after,
+  ) {
+    assert(weekdays.isNotEmpty, 'weekdays must not be empty');
+    DateTime candidate = _atTimeOfDay(after, anchor);
+    // At most 8 days needed to guarantee we cross a full week and
+    // find a matching weekday strictly after `after`.
+    for (int i = 0; i < 8; i++) {
+      if (weekdays.contains(candidate.weekday) && candidate.isAfter(after)) {
+        return candidate;
+      }
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    // Unreachable: weekdays is non-empty and every weekday recurs
+    // within 7 days, so the loop above always returns first.
+    throw StateError(
+      'RecurrenceEngine: no matching weekday found for $weekdays',
+    );
+  }
+
+  static DateTime _atTimeOfDay(DateTime date, DateTime timeSource) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      timeSource.hour,
+      timeSource.minute,
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\recurrence_rule.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'recurrence_rule.freezed.dart';
+
+/// How a [Task] repeats (master spec §12).
+///
+/// `weekly` repeats on the same weekday as the task's original
+/// anchor date. `customDays` repeats on an explicit set of weekdays
+/// (1 = Monday .. 7 = Sunday, matching `DateTime.weekday`) —
+/// deliberately separate from `weekly` since a "weekly" task doesn't
+/// require the user to pick a day (it's implied by the anchor),
+/// while `customDays` always does.
+@freezed
+sealed class RecurrenceRule with _$RecurrenceRule {
+  const factory RecurrenceRule.none() = RecurrenceNone;
+  const factory RecurrenceRule.daily() = RecurrenceDaily;
+  const factory RecurrenceRule.weekly() = RecurrenceWeekly;
+  const factory RecurrenceRule.customDays({required Set<int> weekdays}) =
+      RecurrenceCustomDays;
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'recurrence_rule.dart';
+import 'task_priority.dart';
+
+part 'task.freezed.dart';
+
+/// A task the user wants to be reminded to act on (master spec §10,
+/// §17). Pure Domain type — no Flutter, no Drift.
+///
+/// A [Task] only describes *what* and *how it repeats*; the actual
+/// scheduled instances are [TaskOccurrence]s, generated one at a
+/// time by the Recurrence Engine as each prior occurrence resolves
+/// (master spec §12 — never generated infinitely up front).
+@freezed
+sealed class Task with _$Task {
+  const factory Task({
+    required String id,
+    required String title,
+    String? description,
+    required TaskPriority priority,
+    required RecurrenceRule recurrenceRule,
+    required int defaultToleranceMinutes,
+    required int defaultSnoozeMinutes,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required bool isArchived,
+  }) = _Task;
+
+  const Task._();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_event.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'occurrence_status.dart';
+
+part 'task_event.freezed.dart';
+
+/// An append-only log entry recording one [TaskOccurrence] status
+/// transition (master spec §10 — "the system must preserve
+/// history"). Never updated or deleted, only ever inserted by
+/// [TaskEngine] alongside the occurrence update that caused it.
+@freezed
+sealed class TaskEvent with _$TaskEvent {
+  const factory TaskEvent({
+    required String id,
+    required String taskId,
+    required String occurrenceId,
+    required OccurrenceStatus fromStatus,
+    required OccurrenceStatus toStatus,
+    required DateTime occurredAt,
+    String? note,
+  }) = _TaskEvent;
+
+  const TaskEvent._();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_event_repository.dart
+import '../../../core/result/result.dart';
+import 'task_event.dart';
+
+/// Domain-facing contract for the append-only [TaskEvent] history
+/// log. Implemented by `DriftTaskEventRepository` in the Data layer.
+abstract interface class TaskEventRepository {
+  Future<Result<void>> recordEvent(TaskEvent event);
+
+  /// History for one occurrence, oldest first.
+  Future<Result<List<TaskEvent>>> getEventsForOccurrence(String occurrenceId);
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_occurrence.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'occurrence_status.dart';
+
+part 'task_occurrence.freezed.dart';
+
+/// A single scheduled instance of a [Task] (master spec §10).
+///
+/// Its `status` only ever changes through [OccurrenceStateMachine] —
+/// never assigned directly.
+@freezed
+sealed class TaskOccurrence with _$TaskOccurrence {
+  const factory TaskOccurrence({
+    required String id,
+    required String taskId,
+    required DateTime scheduledAt,
+    DateTime? triggeredAt,
+    DateTime? completedAt,
+    required OccurrenceStatus status,
+    required int snoozeCount,
+    Duration? responseTime,
+    required int toleranceMinutes,
+    String? declineReason,
+  }) = _TaskOccurrence;
+
+  const TaskOccurrence._();
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_occurrence_repository.dart
+import '../../../core/result/result.dart';
+import 'task_occurrence.dart';
+
+/// Domain-facing contract for reading/writing [TaskOccurrence]s.
+/// Implemented by `DriftTaskOccurrenceRepository` in the Data layer.
+abstract interface class TaskOccurrenceRepository {
+  Future<Result<TaskOccurrence>> saveOccurrence(TaskOccurrence occurrence);
+
+  Future<Result<TaskOccurrence?>> getOccurrence(String id);
+
+  /// All occurrences for one task, most recently scheduled first.
+  Future<Result<List<TaskOccurrence>>> getOccurrencesForTask(String taskId);
+
+  /// The single non-terminal (scheduled/triggered/snoozed) occurrence
+  /// for a task, if one exists — a task has at most one "live"
+  /// occurrence at a time (master spec §12: one generated at a time).
+  Future<Result<TaskOccurrence?>> getActiveOccurrenceForTask(String taskId);
+
+  /// All currently-live occurrences, across every task — the
+  /// foundation for `SchedulerEngine.rescheduleAll()` (Fase 3) and
+  /// Fase 7's boot recovery.
+  Future<Result<List<TaskOccurrence>>> getAllActiveOccurrences();
+
+  /// All occurrences scheduled within [start, end] (inclusive),
+  /// across every task, regardless of status — the foundation for
+  /// Fase 5's PerformanceEngine and StreakEngine, which need every
+  /// terminal outcome (COMPLETED/MISSED/DECLINED) in a period, not
+  /// just the live ones.
+  Future<Result<List<TaskOccurrence>>> getOccurrencesInRange(
+    DateTime start,
+    DateTime end,
+  );
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_priority.dart
+/// Task priority (master spec §10).
+enum TaskPriority { low, medium, high }
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\domain\task_repository.dart
+import '../../../core/result/result.dart';
+import 'task.dart';
+
+/// Domain-facing contract for reading/writing [Task]s. Implemented
+/// by `DriftTaskRepository` in the Data layer.
+abstract interface class TaskRepository {
+  Future<Result<Task>> saveTask(Task task);
+
+  Future<Result<Task?>> getTask(String id);
+
+  /// Non-archived tasks, most recently updated first.
+  Future<Result<List<Task>>> getActiveTasks();
+
+  Future<Result<void>> archiveTask(String id);
+
+  Future<Result<void>> deleteTask(String id);
+}

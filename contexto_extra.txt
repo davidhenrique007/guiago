@@ -1,0 +1,1321 @@
+﻿
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\design_system\components\app_metric_card.dart
+import 'package:flutter/material.dart';
+
+import '../../app/theme/app_colors.dart';
+import '../../app/theme/app_spacing.dart';
+import '../../app/theme/app_typography.dart';
+import 'app_card.dart';
+
+/// A single metric on a surface: small label, large value, optional
+/// detail line underneath. Introduced for the Fase 6 dashboard
+/// (Score, Nível, Streak, Completion Rate) — reusable wherever else
+/// the app needs the same "label + big number" shape (e.g. a future
+/// Home summary).
+class AppMetricCard extends StatelessWidget {
+  const AppMetricCard({
+    required this.label,
+    required this.value,
+    this.detail,
+    this.valueColor,
+    super.key,
+  });
+
+  final String label;
+  final String value;
+  final String? detail;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: AppTypography.label),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            style: AppTypography.titleLarge.copyWith(
+              color: valueColor ?? AppColors.textPrimary,
+            ),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: AppSpacing.xs / 2),
+            Text(detail!, style: AppTypography.bodyMedium),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\design_system\components\app_trend_chart.dart
+import 'package:flutter/material.dart';
+
+import '../../app/theme/app_colors.dart';
+
+/// Bar chart of one value per day, drawn with [CustomPainter] — no
+/// charting dependency. The master spec (§4) doesn't list one, and
+/// this project's Riverpod/Freezed versions are recent enough that
+/// adding a charting package without verifying compatibility first
+/// would risk exactly the kind of breakage already seen in Fase 5.
+///
+/// Deliberately feature-agnostic: takes plain doubles, not a
+/// dashboard-specific type, so design_system/ never has to import a
+/// feature.
+class AppTrendChart extends StatelessWidget {
+  const AppTrendChart({required this.values, this.height = 120, super.key});
+
+  /// One value per bar, oldest first, each normally 0.0–1.0.
+  /// A negative value means "no data that day" and draws as a
+  /// small empty tick instead of a bar.
+  final List<double> values;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(painter: _TrendChartPainter(values: values)),
+    );
+  }
+}
+
+class _TrendChartPainter extends CustomPainter {
+  _TrendChartPainter({required this.values});
+
+  final List<double> values;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    final double barWidth = size.width / values.length;
+    final double gap = barWidth * 0.28;
+    final Paint filledPaint = Paint()..color = AppColors.primary;
+    final Paint emptyPaint = Paint()..color = AppColors.surfaceMuted;
+
+    for (int i = 0; i < values.length; i++) {
+      final double value = values[i];
+      final bool hasData = value >= 0;
+      final double clamped = hasData ? value.clamp(0.0, 1.0) : 0.0;
+      final double barHeight =
+          hasData ? (size.height * clamped).clamp(4.0, size.height) : 4.0;
+
+      final double left = i * barWidth + gap / 2;
+      final double right = (i + 1) * barWidth - gap / 2;
+      final double top = size.height - barHeight;
+
+      final RRect rect = RRect.fromRectAndRadius(
+        Rect.fromLTRB(left, top, right, size.height),
+        const Radius.circular(3),
+      );
+      canvas.drawRRect(rect, hasData ? filledPaint : emptyPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
+    return oldDelegate.values != values;
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\presentation\widgets\dashboard_metrics_grid.dart
+import 'package:flutter/material.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../../performance/domain/level.dart';
+import '../../domain/dashboard_snapshot.dart';
+
+/// The 4 headline numbers (master spec §6/§22): Score, Nível, Streak
+/// and Completion Rate. Score, Nível and Streak are all-time — they
+/// don't change with the selected period; only Completion Rate does.
+class DashboardMetricsGrid extends StatelessWidget {
+  const DashboardMetricsGrid({required this.snapshot, super.key});
+
+  final DashboardSnapshot snapshot;
+
+  static const Map<LevelTier, String> _tierLabels = {
+    LevelTier.beginner: 'Iniciante',
+    LevelTier.consistent: 'Consistente',
+    LevelTier.disciplined: 'Disciplinado',
+    LevelTier.elite: 'Elite',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasData = !snapshot.performance.isEmpty;
+    final int completionPercent =
+        hasData ? (snapshot.performance.completionRate * 100).round() : 0;
+
+    final Color? completionColor = !hasData
+        ? null
+        : completionPercent >= 70
+            ? AppColors.success
+            : completionPercent >= 40
+                ? AppColors.warning
+                : AppColors.error;
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: AppSpacing.md,
+      crossAxisSpacing: AppSpacing.md,
+      childAspectRatio: 1.6,
+      children: [
+        AppMetricCard(
+          label: 'Pontuação',
+          value: '${snapshot.score.total}',
+        ),
+        AppMetricCard(
+          label: 'Nível',
+          value: _tierLabels[snapshot.level?.tier ?? LevelTier.beginner]!,
+        ),
+        AppMetricCard(
+          label: 'Sequência',
+          value: '${snapshot.streak?.currentStreak ?? 0} dias',
+          detail: 'recorde: ${snapshot.streak?.longestStreak ?? 0}',
+        ),
+        AppMetricCard(
+          label: 'Conclusão',
+          value: hasData ? '$completionPercent%' : '—',
+          valueColor: completionColor,
+        ),
+      ],
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\presentation\widgets\dashboard_period_selector.dart
+import 'package:flutter/material.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../domain/dashboard_period.dart';
+
+/// Segmented Hoje/Semana/Mês toggle. Built directly on Material
+/// (not AppButton) — an exclusive 3-way pill selector doesn't map to
+/// three separate buttons, and matches the "calm, disciplined"
+/// identity (master spec §7) better than a default SegmentedButton.
+class DashboardPeriodSelector extends StatelessWidget {
+  const DashboardPeriodSelector({
+    required this.selected,
+    required this.onChanged,
+    super.key,
+  });
+
+  final DashboardPeriod selected;
+  final ValueChanged<DashboardPeriod> onChanged;
+
+  static const Map<DashboardPeriod, String> _labels = {
+    DashboardPeriod.today: 'Hoje',
+    DashboardPeriod.week: 'Semana',
+    DashboardPeriod.month: 'Mês',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: DashboardPeriod.values.map((DashboardPeriod period) {
+          final bool isSelected = period == selected;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(period),
+              child: AnimatedContainer(
+                duration: AppDurations.medium,
+                curve: AppCurves.standard,
+                margin: const EdgeInsets.all(2),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.surface : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border:
+                      isSelected ? Border.all(color: AppColors.border) : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _labels[period]!,
+                  style: AppTypography.label.copyWith(
+                    color: isSelected
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\dashboard\presentation\widgets\dashboard_trend_section.dart
+import 'package:flutter/material.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../domain/dashboard_period.dart';
+import '../../domain/dashboard_snapshot.dart';
+
+/// Trend chart card: the daily completion-rate bars plus a caption
+/// naming the period.
+class DashboardTrendSection extends StatelessWidget {
+  const DashboardTrendSection({required this.snapshot, super.key});
+
+  final DashboardSnapshot snapshot;
+
+  static const Map<DashboardPeriod, String> _captions = {
+    DashboardPeriod.today: 'Hoje',
+    DashboardPeriod.week: 'Últimos 7 dias',
+    DashboardPeriod.month: 'Últimos 30 dias',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final List<double> values = snapshot.trend
+        .map((point) => point.hasData ? point.completionRate : -1.0)
+        .toList();
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Tendência', style: AppTypography.titleMedium),
+          const SizedBox(height: AppSpacing.xs / 2),
+          Text(_captions[snapshot.period]!, style: AppTypography.bodyMedium),
+          const SizedBox(height: AppSpacing.md),
+          AppTrendChart(values: values),
+        ],
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\presentation\widgets\home_greeting.dart
+import 'package:flutter/material.dart';
+
+import '../../../../design_system/design_system.dart';
+
+/// Saudação + data (master spec §22).
+class HomeGreeting extends StatelessWidget {
+  const HomeGreeting({required this.userName, required this.today, super.key});
+
+  final String userName;
+  final DateTime today;
+
+  static const List<String> _weekdays = <String>[
+    'segunda-feira',
+    'terça-feira',
+    'quarta-feira',
+    'quinta-feira',
+    'sexta-feira',
+    'sábado',
+    'domingo',
+  ];
+
+  static const List<String> _months = <String>[
+    'janeiro',
+    'fevereiro',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
+  ];
+
+  String get _period {
+    final int hour = DateTime.now().hour;
+    if (hour < 12) return 'Bom dia';
+    if (hour < 19) return 'Boa tarde';
+    return 'Boa noite';
+  }
+
+  String get _dateLabel {
+    final String weekday = _weekdays[today.weekday - 1];
+    final String month = _months[today.month - 1];
+    return '${_capitalize(weekday)}, ${today.day} de $month';
+  }
+
+  static String _capitalize(String value) =>
+      '${value[0].toUpperCase()}${value.substring(1)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final String suffix = userName.trim().isEmpty ? '' : ', $userName';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text('$_period$suffix', style: AppTypography.displayLarge),
+        const SizedBox(height: AppSpacing.xs),
+        Text(_dateLabel, style: AppTypography.bodyMedium),
+      ],
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\home\presentation\widgets\home_progress_card.dart
+import 'package:flutter/material.dart';
+
+import '../../../../design_system/design_system.dart';
+import '../../domain/home_snapshot.dart';
+
+/// Today's progress bar + "X de Y concluídas" caption.
+class HomeProgressCard extends StatelessWidget {
+  const HomeProgressCard({required this.snapshot, super.key});
+
+  final HomeSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('Progresso de hoje', style: AppTypography.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          AppProgress(value: snapshot.progress),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            snapshot.hasTasksToday
+                ? '${snapshot.completedCount} de ${snapshot.totalCount} concluídas'
+                : 'Nada agendado para hoje.',
+            style: AppTypography.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\application\level_engine.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// LevelEngine (secção 20 da master spec)
+
+import '../domain/level.dart';
+import '../domain/level_policy.dart';
+import '../domain/performance_record.dart';
+
+class LevelEngine {
+  const LevelEngine({this.policy = LevelPolicy.defaultPolicy});
+
+  final LevelPolicy policy;
+
+  /// [id] é gerado pelo chamador (uuid), consistente com o padrão
+  /// já usado nas fases anteriores. [recentPerformance] deve cobrir
+  /// uma janela curta (ex.: últimos 7 ou 14 dias) — é o que impede
+  /// um score alto e antigo de manter alguém em ELITE se o
+  /// desempenho recente caiu.
+  LevelStatus evaluate({
+    required String id,
+    required int totalScore,
+    required LevelTier previousTier,
+    required PerformanceRecord recentPerformance,
+    required DateTime evaluatedAt,
+  }) {
+    var tier = policy.tierForScore(totalScore);
+
+    final belowFloor = !recentPerformance.isEmpty &&
+        recentPerformance.completionRate < policy.recentCompletionRateFloor;
+
+    if (belowFloor && tier.rank > LevelTier.beginner.rank) {
+      tier = LevelTier.values[tier.rank - 1];
+    }
+
+    return LevelStatus(
+      id: id,
+      tier: tier,
+      previousTier: previousTier,
+      scoreAtEvaluation: totalScore,
+      evaluatedAt: evaluatedAt,
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\application\performance_engine.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// PerformanceEngine (secção 18 da master spec)
+//
+// Função pura: recebe outcomes de um período, devolve um
+// PerformanceRecord. Sem I/O, sem SQLite, sem Flutter — por isso
+// não usa Result<T> aqui (não há falha de infraestrutura
+// possível; lista vazia é um caso válido, não um erro).
+
+import '../domain/occurrence_outcome.dart';
+import '../domain/performance_record.dart';
+
+class PerformanceEngine {
+  const PerformanceEngine();
+
+  PerformanceRecord calculate({
+    required String id,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    required List<OccurrenceOutcome> outcomes,
+    required DateTime calculatedAt,
+  }) {
+    assert(
+      !periodEnd.isBefore(periodStart),
+      'periodEnd não pode ser anterior a periodStart',
+    );
+
+    final total = outcomes.length;
+
+    if (total == 0) {
+      return PerformanceRecord(
+        id: id,
+        periodStart: periodStart,
+        periodEnd: periodEnd,
+        totalOccurrences: 0,
+        completedCount: 0,
+        completedAfterSnoozeCount: 0,
+        missedCount: 0,
+        declinedCount: 0,
+        snoozedCount: 0,
+        completionRate: 0,
+        missRate: 0,
+        snoozeRate: 0,
+        averageResponseTime: null,
+        calculatedAt: calculatedAt,
+      );
+    }
+
+    final completed =
+        outcomes.where((o) => o.status == OutcomeStatus.completed).toList();
+    final completedAfterSnooze =
+        completed.where((o) => o.snoozeCount > 0).toList();
+    final missed =
+        outcomes.where((o) => o.status == OutcomeStatus.missed).toList();
+    final declined =
+        outcomes.where((o) => o.status == OutcomeStatus.declined).toList();
+    final snoozed = outcomes.where((o) => o.snoozeCount > 0).toList();
+
+    final responseTimes =
+        outcomes.map((o) => o.responseTime).whereType<Duration>().toList();
+
+    final averageResponseTime = responseTimes.isEmpty
+        ? null
+        : Duration(
+            microseconds: responseTimes.fold<int>(
+                  0,
+                  (sum, d) => sum + d.inMicroseconds,
+                ) ~/
+                responseTimes.length,
+          );
+
+    return PerformanceRecord(
+      id: id,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
+      totalOccurrences: total,
+      completedCount: completed.length,
+      completedAfterSnoozeCount: completedAfterSnooze.length,
+      missedCount: missed.length,
+      declinedCount: declined.length,
+      snoozedCount: snoozed.length,
+      completionRate: completed.length / total,
+      missRate: missed.length / total,
+      snoozeRate: snoozed.length / total,
+      averageResponseTime: averageResponseTime,
+      calculatedAt: calculatedAt,
+    );
+  }
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\performance\data\performance_providers.dart
+// GuiaGo — Fase 5: Performance Engine + Gamification
+// Providers Riverpod — mesmo padrão de task_providers.dart e
+// scheduler_providers.dart: Provider<T> simples, repositórios
+// observam appDatabaseProvider, engines são stateless (const).
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/services/app_database.dart';
+import '../../../core/services/database_provider.dart';
+import '../../tasks/data/task_providers.dart';
+import '../application/level_engine.dart';
+import '../application/performance_controller.dart';
+import '../application/performance_engine.dart';
+import '../application/score_engine.dart';
+import '../application/streak_engine.dart';
+import '../domain/level_repository.dart';
+import '../domain/performance_record_repository.dart';
+import '../domain/score_repository.dart';
+import '../domain/streak_repository.dart';
+import 'drift_level_repository.dart';
+import 'drift_performance_record_repository.dart';
+import 'drift_score_repository.dart';
+import 'drift_streak_repository.dart';
+import 'occurrence_outcome_mapper.dart';
+
+// --- Repositórios ---
+
+final Provider<PerformanceRecordRepository>
+    performanceRecordRepositoryProvider =
+    Provider<PerformanceRecordRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftPerformanceRecordRepository(db);
+});
+
+final Provider<ScoreRepository> scoreRepositoryProvider =
+    Provider<ScoreRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftScoreRepository(db);
+});
+
+final Provider<LevelRepository> levelRepositoryProvider =
+    Provider<LevelRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftLevelRepository(db);
+});
+
+final Provider<StreakRepository> streakRepositoryProvider =
+    Provider<StreakRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftStreakRepository(db);
+});
+
+// --- Mapper ---
+
+final Provider<OccurrenceOutcomeMapper> occurrenceOutcomeMapperProvider =
+    Provider<OccurrenceOutcomeMapper>(
+  (ref) => const OccurrenceOutcomeMapper(),
+);
+
+// --- Engines (stateless, sem dependências — const direto) ---
+
+final Provider<PerformanceEngine> performanceEngineProvider =
+    Provider<PerformanceEngine>((ref) => const PerformanceEngine());
+
+final Provider<ScoreEngine> scoreEngineProvider = Provider<ScoreEngine>(
+  (ref) => const ScoreEngine(),
+);
+
+final Provider<LevelEngine> levelEngineProvider = Provider<LevelEngine>(
+  (ref) => const LevelEngine(),
+);
+
+final Provider<StreakEngine> streakEngineProvider = Provider<StreakEngine>(
+  (ref) => const StreakEngine(),
+);
+
+// --- Controller (orquestra tudo acima) ---
+
+final Provider<PerformanceController> performanceControllerProvider =
+    Provider<PerformanceController>((ref) {
+  return PerformanceController(
+    occurrenceRepository: ref.watch(taskOccurrenceRepositoryProvider),
+    mapper: ref.watch(occurrenceOutcomeMapperProvider),
+    performanceEngine: ref.watch(performanceEngineProvider),
+    scoreEngine: ref.watch(scoreEngineProvider),
+    levelEngine: ref.watch(levelEngineProvider),
+    streakEngine: ref.watch(streakEngineProvider),
+    performanceRecordRepository: ref.watch(performanceRecordRepositoryProvider),
+    scoreRepository: ref.watch(scoreRepositoryProvider),
+    levelRepository: ref.watch(levelRepositoryProvider),
+    streakRepository: ref.watch(streakRepositoryProvider),
+  );
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\lib\features\tasks\data\task_providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/services/app_database.dart';
+import '../../../core/services/database_provider.dart';
+import '../domain/task_event_repository.dart';
+import '../domain/task_occurrence_repository.dart';
+import '../domain/task_repository.dart';
+import 'drift_task_event_repository.dart';
+import 'drift_task_occurrence_repository.dart';
+import 'drift_task_repository.dart';
+
+/// Application/Presentation code depends on the domain repository
+/// interfaces; these providers are the only place that knows the
+/// concrete implementations are Drift-backed.
+///
+/// NOTE: `taskEngineProvider` deliberately does NOT live here — see
+/// `task_engine_provider.dart`. [TaskEngine] depends on
+/// `SchedulerEngine` (Fase 3), and `SchedulerEngine` depends on the
+/// repository providers declared in this very file, so composing
+/// `TaskEngine` here would make this file and
+/// `scheduler/data/scheduler_providers.dart` import each other —
+/// a circular import. Splitting the composition into its own file
+/// (which is free to depend on both) avoids that cycle entirely.
+final Provider<TaskRepository> taskRepositoryProvider =
+    Provider<TaskRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftTaskRepository(db);
+});
+
+final Provider<TaskOccurrenceRepository> taskOccurrenceRepositoryProvider =
+    Provider<TaskOccurrenceRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftTaskOccurrenceRepository(db);
+});
+
+final Provider<TaskEventRepository> taskEventRepositoryProvider =
+    Provider<TaskEventRepository>((ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return DriftTaskEventRepository(db);
+});
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\test\features\dashboard\presentation\dashboard_screen_test.dart
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:guiago/core/services/app_database.dart';
+import 'package:guiago/core/services/database_provider.dart';
+import 'package:guiago/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:guiago/features/tasks/data/drift_task_occurrence_repository.dart';
+import 'package:guiago/features/tasks/data/drift_task_repository.dart';
+import 'package:guiago/features/tasks/domain/occurrence_status.dart';
+import 'package:guiago/features/tasks/domain/recurrence_rule.dart';
+import 'package:guiago/features/tasks/domain/task.dart';
+import 'package:guiago/features/tasks/domain/task_occurrence.dart';
+import 'package:guiago/features/tasks/domain/task_priority.dart';
+
+void main() {
+  late AppDatabase db;
+
+  setUp(() async {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    await DriftTaskRepository(db).saveTask(
+      Task(
+        id: 'task-1',
+        title: 'Beber água',
+        priority: TaskPriority.low,
+        recurrenceRule: const RecurrenceRule.none(),
+        defaultToleranceMinutes: 15,
+        defaultSnoozeMinutes: 10,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isArchived: false,
+      ),
+    );
+  });
+
+  tearDown(() => db.close());
+
+  Future<void> seedOccurrence(DateTime scheduledAt, OccurrenceStatus status) {
+    return DriftTaskOccurrenceRepository(db).saveOccurrence(
+      TaskOccurrence(
+        id: 'occ-${scheduledAt.millisecondsSinceEpoch}',
+        taskId: 'task-1',
+        scheduledAt: scheduledAt,
+        status: status,
+        snoozeCount: 0,
+        toleranceMinutes: 15,
+      ),
+    );
+  }
+
+  Future<void> pumpDashboardScreen(WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('shows zeroed metrics when there is no data', (
+    WidgetTester tester,
+  ) async {
+    await pumpDashboardScreen(tester);
+
+    expect(find.text('Desempenho'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget); // Pontuação
+    expect(find.text('Iniciante'), findsOneWidget); // Nível
+    expect(find.text('0 dias'), findsOneWidget); // Sequência
+    expect(find.text('—'), findsOneWidget); // Conclusão, sem dados
+  });
+
+  testWidgets('shows completion for today from a completed occurrence', (
+    WidgetTester tester,
+  ) async {
+    await seedOccurrence(DateTime.now(), OccurrenceStatus.completed);
+
+    await pumpDashboardScreen(tester);
+
+    expect(find.text('100%'), findsOneWidget);
+  });
+
+  testWidgets('switching to Semana reveals data outside today', (
+    WidgetTester tester,
+  ) async {
+    await seedOccurrence(
+      DateTime.now().subtract(const Duration(days: 2)),
+      OccurrenceStatus.completed,
+    );
+
+    await pumpDashboardScreen(tester);
+    expect(find.text('—'), findsOneWidget); // Hoje: nada agendado hoje
+
+    await tester.tap(find.text('Semana'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('100%'), findsOneWidget);
+  });
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\test\features\home\application\home_service_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:guiago/features/home/application/home_service.dart';
+import 'package:guiago/features/onboarding/domain/settings.dart';
+import 'package:guiago/features/tasks/domain/occurrence_status.dart';
+import 'package:guiago/features/tasks/domain/recurrence_rule.dart';
+import 'package:guiago/features/tasks/domain/task.dart';
+import 'package:guiago/features/tasks/domain/task_occurrence.dart';
+import 'package:guiago/features/tasks/domain/task_priority.dart';
+
+import '../../performance/support/in_memory_repositories.dart';
+import '../support/in_memory_repositories.dart';
+
+void main() {
+  late InMemoryTaskOccurrenceRepository occurrences;
+  late InMemoryTaskRepository tasks;
+  late InMemorySettingsRepository settings;
+  late HomeService service;
+
+  final DateTime now = DateTime(2026, 3, 15, 12);
+
+  Task task(String id, String title) {
+    return Task(
+      id: id,
+      title: title,
+      priority: TaskPriority.low,
+      recurrenceRule: const RecurrenceRule.none(),
+      defaultToleranceMinutes: 15,
+      defaultSnoozeMinutes: 10,
+      createdAt: now,
+      updatedAt: now,
+      isArchived: false,
+    );
+  }
+
+  TaskOccurrence occurrence(
+    String id,
+    String taskId,
+    DateTime scheduledAt,
+    OccurrenceStatus status,
+  ) {
+    return TaskOccurrence(
+      id: id,
+      taskId: taskId,
+      scheduledAt: scheduledAt,
+      status: status,
+      snoozeCount: 0,
+      toleranceMinutes: 15,
+    );
+  }
+
+  setUp(() {
+    occurrences = InMemoryTaskOccurrenceRepository();
+    tasks = InMemoryTaskRepository();
+    settings = InMemorySettingsRepository();
+    service = HomeService(
+      occurrenceRepository: occurrences,
+      taskRepository: tasks,
+      settingsRepository: settings,
+    );
+  });
+
+  group('HomeService.load', () {
+    test('returns the saved user name with no tasks today', () async {
+      settings.settings = Settings.initial.copyWith(userName: 'Ana');
+
+      final result = await service.load(now: now);
+      final snapshot = result.valueOrNull!;
+
+      expect(snapshot.userName, 'Ana');
+      expect(snapshot.todayTasks, isEmpty);
+      expect(snapshot.nextTask, isNull);
+      expect(snapshot.hasTasksToday, isFalse);
+    });
+
+    test("joins today's occurrences with their task's title and priority",
+        () async {
+      await tasks.saveTask(task('t1', 'Beber água'));
+      await occurrences.saveOccurrence(
+        occurrence(
+            'o1', 't1', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+      );
+
+      final result = await service.load(now: now);
+      final snapshot = result.valueOrNull!;
+
+      expect(snapshot.todayTasks, hasLength(1));
+      expect(snapshot.todayTasks.single.title, 'Beber água');
+      expect(snapshot.todayTasks.single.priority, TaskPriority.low);
+    });
+
+    test('drops cancelled occurrences and occurrences of deleted tasks',
+        () async {
+      await tasks.saveTask(task('t1', 'Tarefa viva'));
+      await occurrences.saveOccurrence(
+        occurrence(
+            'o1', 't1', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+      );
+      await occurrences.saveOccurrence(
+        occurrence(
+          'o2',
+          't1',
+          DateTime(2026, 3, 15, 10),
+          OccurrenceStatus.cancelled,
+        ),
+      );
+      // 't2' never saved — its task was deleted after being scheduled.
+      await occurrences.saveOccurrence(
+        occurrence(
+            'o3', 't2', DateTime(2026, 3, 15, 11), OccurrenceStatus.scheduled,),
+      );
+
+      final result = await service.load(now: now);
+
+      expect(result.valueOrNull!.todayTasks, hasLength(1));
+      expect(result.valueOrNull!.todayTasks.single.occurrenceId, 'o1');
+    });
+
+    test('nextTask is the first unresolved item, skipping resolved ones',
+        () async {
+      await tasks.saveTask(task('t1', 'Primeira'));
+      await tasks.saveTask(task('t2', 'Segunda'));
+      await occurrences.saveOccurrence(
+        occurrence(
+          'o1',
+          't1',
+          DateTime(2026, 3, 15, 8),
+          OccurrenceStatus.completed,
+        ),
+      );
+      await occurrences.saveOccurrence(
+        occurrence(
+            'o2', 't2', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+      );
+
+      final result = await service.load(now: now);
+
+      expect(result.valueOrNull!.nextTask?.title, 'Segunda');
+    });
+
+    test('nextTask is null when everything today is resolved', () async {
+      await tasks.saveTask(task('t1', 'Única'));
+      await occurrences.saveOccurrence(
+        occurrence(
+          'o1',
+          't1',
+          DateTime(2026, 3, 15, 8),
+          OccurrenceStatus.completed,
+        ),
+      );
+
+      final result = await service.load(now: now);
+
+      expect(result.valueOrNull!.nextTask, isNull);
+      expect(result.valueOrNull!.completedCount, 1);
+      expect(result.valueOrNull!.progress, 1.0);
+    });
+
+    test('only includes occurrences scheduled today', () async {
+      await tasks.saveTask(task('t1', 'Ontem'));
+      await tasks.saveTask(task('t2', 'Hoje'));
+      await occurrences.saveOccurrence(
+        occurrence(
+          'o1',
+          't1',
+          DateTime(2026, 3, 14, 23),
+          OccurrenceStatus.scheduled,
+        ),
+      );
+      await occurrences.saveOccurrence(
+        occurrence(
+            'o2', 't2', DateTime(2026, 3, 15, 1), OccurrenceStatus.scheduled,),
+      );
+
+      final result = await service.load(now: now);
+
+      expect(result.valueOrNull!.todayTasks, hasLength(1));
+      expect(result.valueOrNull!.todayTasks.single.title, 'Hoje');
+    });
+  });
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\test\features\home\presentation\home_screen_test.dart
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:guiago/app/router/app_router.dart';
+import 'package:guiago/core/services/app_database.dart';
+import 'package:guiago/core/services/database_provider.dart';
+import 'package:guiago/features/home/presentation/screens/home_screen.dart';
+import 'package:guiago/features/onboarding/data/drift_settings_repository.dart';
+import 'package:guiago/features/onboarding/domain/settings.dart';
+import 'package:guiago/features/tasks/data/drift_task_occurrence_repository.dart';
+import 'package:guiago/features/tasks/data/drift_task_repository.dart';
+import 'package:guiago/features/tasks/domain/occurrence_status.dart';
+import 'package:guiago/features/tasks/domain/recurrence_rule.dart';
+import 'package:guiago/features/tasks/domain/task.dart';
+import 'package:guiago/features/tasks/domain/task_occurrence.dart';
+import 'package:guiago/features/tasks/domain/task_priority.dart';
+
+void main() {
+  late AppDatabase db;
+
+  setUp(() async {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+  });
+
+  tearDown(() => db.close());
+
+  Future<void> seedTask(String id, String title) {
+    return DriftTaskRepository(db).saveTask(
+      Task(
+        id: id,
+        title: title,
+        priority: TaskPriority.low,
+        recurrenceRule: const RecurrenceRule.none(),
+        defaultToleranceMinutes: 15,
+        defaultSnoozeMinutes: 10,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isArchived: false,
+      ),
+    );
+  }
+
+  Future<void> seedOccurrence(
+    String id,
+    String taskId,
+    DateTime scheduledAt,
+    OccurrenceStatus status,
+  ) {
+    return DriftTaskOccurrenceRepository(db).saveOccurrence(
+      TaskOccurrence(
+        id: id,
+        taskId: taskId,
+        scheduledAt: scheduledAt,
+        status: status,
+        snoozeCount: 0,
+        toleranceMinutes: 15,
+      ),
+    );
+  }
+
+  Future<void> pumpHomeScreen(WidgetTester tester) async {
+    final GoRouter router = GoRouter(
+      initialLocation: AppRoutes.home,
+      routes: <RouteBase>[
+        GoRoute(
+          path: AppRoutes.home,
+          name: AppRoutes.homeName,
+          builder: (BuildContext context, GoRouterState state) =>
+              const HomeScreen(),
+        ),
+        GoRoute(
+          path: AppRoutes.dashboard,
+          name: AppRoutes.dashboardName,
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('DASHBOARD')),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('shows the greeting and an empty state with nothing today', (
+    WidgetTester tester,
+  ) async {
+    await DriftSettingsRepository(
+      db,
+    ).saveSettings(Settings.initial.copyWith(userName: 'Ana'));
+
+    await pumpHomeScreen(tester);
+
+    expect(find.textContaining('Ana'), findsOneWidget);
+    expect(find.text('Sem tarefas para hoje'), findsOneWidget);
+    expect(find.text('Tudo em dia por agora.'), findsOneWidget);
+  });
+
+  testWidgets('shows the next task and progress from seeded occurrences', (
+    WidgetTester tester,
+  ) async {
+    await seedTask('task-1', 'Beber água');
+    await seedOccurrence(
+      'occ-1',
+      'task-1',
+      DateTime.now(),
+      OccurrenceStatus.scheduled,
+    );
+
+    await pumpHomeScreen(tester);
+
+    expect(find.text('Beber água'), findsNWidgets(2)); // próxima + lista
+    expect(find.text('0 de 1 concluídas'), findsOneWidget);
+  });
+
+  testWidgets('tapping the insights icon navigates to the dashboard', (
+    WidgetTester tester,
+  ) async {
+    await pumpHomeScreen(tester);
+
+    await tester.tap(find.byIcon(Icons.insights_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DASHBOARD'), findsOneWidget);
+  });
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\test\features\performance\application\level_engine_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:guiago/features/performance/application/level_engine.dart';
+import 'package:guiago/features/performance/domain/level.dart';
+import 'package:guiago/features/performance/domain/performance_record.dart';
+
+void main() {
+  const engine = LevelEngine();
+
+  PerformanceRecord recordWithRate(double completionRate, {int total = 10}) {
+    final completed = (completionRate * total).round();
+    return PerformanceRecord(
+      id: 'p1',
+      periodStart: DateTime(2026, 1, 1),
+      periodEnd: DateTime(2026, 1, 7),
+      totalOccurrences: total,
+      completedCount: completed,
+      completedAfterSnoozeCount: 0,
+      missedCount: total - completed,
+      declinedCount: 0,
+      snoozedCount: 0,
+      completionRate: completionRate,
+      missRate: 1 - completionRate,
+      snoozeRate: 0,
+      averageResponseTime: null,
+      calculatedAt: DateTime(2026, 1, 7),
+    );
+  }
+
+  final emptyRecord = PerformanceRecord(
+    id: 'p0',
+    periodStart: DateTime(2026, 1, 1),
+    periodEnd: DateTime(2026, 1, 7),
+    totalOccurrences: 0,
+    completedCount: 0,
+    completedAfterSnoozeCount: 0,
+    missedCount: 0,
+    declinedCount: 0,
+    snoozedCount: 0,
+    completionRate: 0,
+    missRate: 0,
+    snoozeRate: 0,
+    averageResponseTime: null,
+    calculatedAt: DateTime(2026, 1, 7),
+  );
+
+  group('LevelEngine.evaluate', () {
+    test(
+      'picks the tier matching the score when recent performance is good',
+      () {
+        final status = engine.evaluate(
+          id: 'l1',
+          totalScore: 750,
+          previousTier: LevelTier.disciplined,
+          recentPerformance: recordWithRate(0.9),
+          evaluatedAt: DateTime(2026, 1, 7),
+        );
+
+        expect(status.tier, LevelTier.elite);
+        expect(status.previousTier, LevelTier.disciplined);
+        expect(status.scoreAtEvaluation, 750);
+      },
+    );
+
+    test(
+      'downgrades one tier when recent completion rate is below the floor',
+      () {
+        final status = engine.evaluate(
+          id: 'l2',
+          totalScore: 750,
+          previousTier: LevelTier.elite,
+          recentPerformance: recordWithRate(0.3),
+          evaluatedAt: DateTime(2026, 1, 7),
+        );
+
+        expect(status.tier, LevelTier.disciplined);
+      },
+    );
+
+    test('never downgrades below beginner', () {
+      final status = engine.evaluate(
+        id: 'l3',
+        totalScore: 10,
+        previousTier: LevelTier.beginner,
+        recentPerformance: recordWithRate(0.1),
+        evaluatedAt: DateTime(2026, 1, 7),
+      );
+
+      expect(status.tier, LevelTier.beginner);
+    });
+
+    test('does not penalize when there is no recent data', () {
+      final status = engine.evaluate(
+        id: 'l4',
+        totalScore: 750,
+        previousTier: LevelTier.elite,
+        recentPerformance: emptyRecord,
+        evaluatedAt: DateTime(2026, 1, 7),
+      );
+
+      expect(status.tier, LevelTier.elite);
+    });
+  });
+}
+
+##### C:\Users\dell\Desktop\Code 01\Guigo Project\test\features\performance\application\performance_engine_test.dart
+import 'package:flutter_test/flutter_test.dart';
+import 'package:guiago/features/performance/application/performance_engine.dart';
+import 'package:guiago/features/performance/domain/occurrence_outcome.dart';
+
+void main() {
+  const engine = PerformanceEngine();
+
+  group('PerformanceEngine.calculate', () {
+    test('returns an empty record when there are no outcomes', () {
+      final record = engine.calculate(
+        id: 'r1',
+        periodStart: DateTime(2026, 1, 1),
+        periodEnd: DateTime(2026, 1, 1, 23, 59, 59),
+        outcomes: const [],
+        calculatedAt: DateTime(2026, 1, 2),
+      );
+
+      expect(record.isEmpty, isTrue);
+      expect(record.totalOccurrences, 0);
+      expect(record.completionRate, 0);
+      expect(record.missRate, 0);
+      expect(record.snoozeRate, 0);
+      expect(record.averageResponseTime, isNull);
+    });
+
+    test('computes counts and rates for a mix of outcomes', () {
+      final outcomes = [
+        const OccurrenceOutcome(
+          occurrenceId: 'o1',
+          status: OutcomeStatus.completed,
+          snoozeCount: 0,
+          responseTime: Duration(minutes: 2),
+        ),
+        const OccurrenceOutcome(
+          occurrenceId: 'o2',
+          status: OutcomeStatus.completed,
+          snoozeCount: 1,
+          responseTime: Duration(minutes: 4),
+        ),
+        const OccurrenceOutcome(
+          occurrenceId: 'o3',
+          status: OutcomeStatus.missed,
+          snoozeCount: 0,
+        ),
+        const OccurrenceOutcome(
+          occurrenceId: 'o4',
+          status: OutcomeStatus.declined,
+          snoozeCount: 0,
+        ),
+      ];
+
+      final record = engine.calculate(
+        id: 'r2',
+        periodStart: DateTime(2026, 1, 1),
+        periodEnd: DateTime(2026, 1, 1, 23, 59, 59),
+        outcomes: outcomes,
+        calculatedAt: DateTime(2026, 1, 2),
+      );
+
+      expect(record.totalOccurrences, 4);
+      expect(record.completedCount, 2);
+      expect(record.completedAfterSnoozeCount, 1);
+      expect(record.missedCount, 1);
+      expect(record.declinedCount, 1);
+      expect(record.snoozedCount, 1);
+      expect(record.completionRate, 0.5);
+      expect(record.missRate, 0.25);
+      expect(record.snoozeRate, 0.25);
+      expect(record.averageResponseTime, const Duration(minutes: 3));
+    });
+
+    test('ignores outcomes without a responseTime when averaging', () {
+      final outcomes = [
+        const OccurrenceOutcome(
+          occurrenceId: 'o1',
+          status: OutcomeStatus.completed,
+          snoozeCount: 0,
+          responseTime: Duration(minutes: 10),
+        ),
+        const OccurrenceOutcome(
+          occurrenceId: 'o2',
+          status: OutcomeStatus.missed,
+          snoozeCount: 0,
+        ),
+      ];
+
+      final record = engine.calculate(
+        id: 'r3',
+        periodStart: DateTime(2026, 1, 1),
+        periodEnd: DateTime(2026, 1, 1, 23, 59, 59),
+        outcomes: outcomes,
+        calculatedAt: DateTime(2026, 1, 2),
+      );
+
+      expect(record.averageResponseTime, const Duration(minutes: 10));
+    });
+
+    test('rejects a period where end precedes start', () {
+      expect(
+        () => engine.calculate(
+          id: 'r4',
+          periodStart: DateTime(2026, 1, 2),
+          periodEnd: DateTime(2026, 1, 1),
+          outcomes: const [],
+          calculatedAt: DateTime(2026, 1, 2),
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+  });
+}
+
+  lib\features\tasks\application\task_engine.dart:167:    return _resolveOccurrence(
+  lib\features\tasks\application\task_engine.dart:168:      occurrenceId,
+  lib\features\tasks\application\task_engine.dart:169:      OccurrenceStatus.completed,
+  lib\features\tasks\application\task_engine.dart:170:      applyExtras: (TaskOccurrence occ) => occ.copyWith(
+> lib\features\tasks\application\task_engine.dart:171:        completedAt: DateTime.now(),
+  lib\features\tasks\application\task_engine.dart:172:        responseTime: responseTime,
+  lib\features\tasks\application\task_engine.dart:173:      ),
+  lib\features\tasks\application\task_engine.dart:174:    );
+  lib\features\tasks\application\task_engine.dart:175:  }
+
+
