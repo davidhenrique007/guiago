@@ -10,6 +10,7 @@ import '../../features/insights/presentation/screens/insights_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/tasks/presentation/screens/task_create_screen.dart';
 import 'app_placeholder_screen.dart';
 import 'app_shell.dart';
@@ -96,10 +97,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.profile,
                 name: AppRoutes.profileName,
                 builder: (BuildContext context, GoRouterState state) =>
-                    const AppPlaceholderScreen(
-                  title: 'Perfil',
-                  icon: Icons.person_outline,
-                ),
+                    const ProfileScreen(),
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'insights',

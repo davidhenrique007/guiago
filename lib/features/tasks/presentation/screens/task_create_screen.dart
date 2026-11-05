@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../onboarding/application/settings_controller.dart';
+import '../../../onboarding/domain/settings.dart';
 import '../../../scheduler/data/scheduler_providers.dart';
 import '../../domain/recurrence_rule.dart';
 import '../../domain/task_priority.dart';
+import '../widgets/task_create_minutes_selector.dart';
+import '../widgets/task_create_options.dart';
 import '../widgets/task_create_priority_selector.dart';
 import '../widgets/task_create_recurrence_selector.dart';
 
 /// Quick task creation (master spec §23): título, data, hora,
-/// prioridade, recorrência, descrição opcional. Tolerância e snooze
-/// ficam nos defaults do TaskEngine (15/10 min) — mínimo de fricção,
-/// por desenho (§23).
+/// prioridade, recorrência, descrição opcional, tolerância e snooze.
+/// Tolerância e snooze começam nos valores guardados no onboarding
+/// (Settings) e só se mexe neles se for preciso — mínimo de fricção
+/// (§23).
 ///
 /// Sem controller dedicado: é um único submit sem estado assíncrono
 /// complexo, por isso o ConsumerStatefulWidget chama o TaskEngine
@@ -35,6 +40,11 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
   TaskPriority _priority = TaskPriority.values.first;
   RecurrenceRule _recurrence = const RecurrenceRule.none();
 
+  /// Null = the user has not touched the chip, so the saved default
+  /// from [Settings] applies.
+  int? _toleranceMinutes;
+  int? _snoozeMinutes;
+
   bool _isSaving = false;
   String? _errorMessage;
 
@@ -43,6 +53,18 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  /// The saved settings, or the onboarding defaults while they load
+  /// (or if they cannot be read) — creating a task never waits on it.
+  Settings _settings({required bool watch}) {
+    final AsyncValue<Settings> async = watch
+        ? ref.watch(settingsControllerProvider)
+        : ref.read(settingsControllerProvider);
+    return switch (async) {
+      AsyncData<Settings>(:final value) => value,
+      _ => Settings.initial,
+    };
   }
 
   DateTime get _scheduledAt => DateTime(
@@ -84,12 +106,16 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
     });
 
     final String description = _descriptionController.text.trim();
+    final Settings settings = _settings(watch: false);
     final result = await ref.read(taskEngineWithSchedulerProvider).createTask(
           title: title,
           description: description.isEmpty ? null : description,
           priority: _priority,
           recurrenceRule: _recurrence,
           scheduledAt: _scheduledAt,
+          toleranceMinutes:
+              _toleranceMinutes ?? settings.defaultToleranceMinutes,
+          snoozeMinutes: _snoozeMinutes ?? settings.defaultSnoozeMinutes,
         );
 
     if (!mounted) return;
@@ -112,6 +138,10 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final Settings settings = _settings(watch: true);
+    final int tolerance = _toleranceMinutes ?? settings.defaultToleranceMinutes;
+    final int snooze = _snoozeMinutes ?? settings.defaultSnoozeMinutes;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -128,6 +158,12 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
               hint: 'O que precisas de fazer?',
               autofocus: true,
               controller: _titleController,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Descrição (opcional)',
+              hint: 'Detalhes extra',
+              controller: _descriptionController,
             ),
             const SizedBox(height: AppSpacing.lg),
             Text('Quando', style: AppTypography.titleMedium),
@@ -168,10 +204,28 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
                   setState(() => _recurrence = rule),
             ),
             const SizedBox(height: AppSpacing.lg),
-            AppTextField(
-              label: 'Descrição (opcional)',
-              hint: 'Detalhes extra',
-              controller: _descriptionController,
+            Text('Tolerância', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            TaskCreateMinutesSelector(
+              options: TaskCreateOptions.including(
+                TaskCreateOptions.toleranceMinutes,
+                tolerance,
+              ),
+              selected: tolerance,
+              onChanged: (int minutes) =>
+                  setState(() => _toleranceMinutes = minutes),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Snooze padrão', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            TaskCreateMinutesSelector(
+              options: TaskCreateOptions.including(
+                TaskCreateOptions.snoozeMinutes,
+                snooze,
+              ),
+              selected: snooze,
+              onChanged: (int minutes) =>
+                  setState(() => _snoozeMinutes = minutes),
             ),
             if (_errorMessage != null) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
@@ -184,7 +238,7 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
             ],
             const SizedBox(height: AppSpacing.xl),
             AppButton(
-              label: 'Criar tarefa',
+              label: 'Guardar tarefa',
               onPressed: _isSaving ? null : _submit,
               isLoading: _isSaving,
             ),

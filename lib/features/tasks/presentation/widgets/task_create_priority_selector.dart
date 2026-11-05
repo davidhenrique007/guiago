@@ -4,8 +4,8 @@ import '../../../../design_system/design_system.dart';
 import '../../domain/task_priority.dart';
 import 'task_create_selector_chip.dart';
 
-/// Priority chips, built from [TaskPriority.values] — never needs
-/// updating if the enum grows (master spec §23).
+/// Priority chips, built from [TaskPriority.values]; the exhaustive
+/// switch in `_label` makes the compiler flag a new priority.
 class TaskCreatePrioritySelector extends StatelessWidget {
   const TaskCreatePrioritySelector({
     required this.selected,
@@ -16,10 +16,11 @@ class TaskCreatePrioritySelector extends StatelessWidget {
   final TaskPriority selected;
   final ValueChanged<TaskPriority> onChanged;
 
-  static String _label(TaskPriority priority) {
-    final String name = priority.name;
-    return '${name[0].toUpperCase()}${name.substring(1)}';
-  }
+  static String _label(TaskPriority priority) => switch (priority) {
+        TaskPriority.low => 'Baixa',
+        TaskPriority.medium => 'Média',
+        TaskPriority.high => 'Alta',
+      };
 
   @override
   Widget build(BuildContext context) {

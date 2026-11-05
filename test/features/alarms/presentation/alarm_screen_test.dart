@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:guiago/core/result/result.dart';
 import 'package:guiago/core/services/app_database.dart';
 import 'package:guiago/core/services/database_provider.dart';
+import 'package:guiago/core/utils/pt_date_labels.dart';
 import 'package:guiago/features/alarms/application/alarm_providers.dart';
 import 'package:guiago/features/alarms/domain/tts_speaker.dart';
 import 'package:guiago/features/alarms/presentation/screens/alarm_screen.dart';
@@ -54,6 +55,10 @@ class _FakeTtsSpeaker implements TtsSpeaker {
 void main() {
   late AppDatabase db;
 
+  // Fixed on purpose: the alarm flow does not depend on when the
+  // occurrence was scheduled, only the displayed label does.
+  final DateTime scheduledAt = DateTime(2026, 8, 14, 14);
+
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     await DriftTaskRepository(db).saveTask(
@@ -73,7 +78,7 @@ void main() {
       TaskOccurrence(
         id: 'occ-1',
         taskId: 'task-1',
-        scheduledAt: DateTime.now(),
+        scheduledAt: scheduledAt,
         status: OccurrenceStatus.scheduled,
         snoozeCount: 0,
         toleranceMinutes: 15,
@@ -121,8 +126,24 @@ void main() {
 
     expect(find.text('Beber água'), findsOneWidget);
     expect(find.text('Concluída'), findsOneWidget);
-    expect(find.text('Adiar'), findsOneWidget);
-    expect(find.text('Não vou'), findsOneWidget);
+    expect(find.text('Adiar 10 min'), findsOneWidget);
+    expect(find.text('Não vou fazer'), findsOneWidget);
+  });
+
+  testWidgets('shows the lead-in, the scheduled time and the tolerance', (
+    WidgetTester tester,
+  ) async {
+    await pumpAlarmScreen(tester);
+
+    expect(find.text('Está na hora de'), findsOneWidget);
+    expect(
+      find.text(
+        '${PtDateLabels.time(scheduledAt)} · '
+        '${PtDateLabels.dayAndMonthUpper(scheduledAt)}',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Tempo de tolerância: 15 min'), findsOneWidget);
   });
 
   testWidgets('tapping Concluída resolves the occurrence and navigates home', (

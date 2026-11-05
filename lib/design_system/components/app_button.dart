@@ -5,7 +5,9 @@ import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_spacing.dart';
 import '../../app/theme/app_typography.dart';
 
-enum AppButtonVariant { primary, secondary, ghost }
+/// `caution` (amber) and `danger` (coral) are tinted, outlined buttons
+/// for secondary-but-loaded actions such as the alarm's Adiar / Não vou.
+enum AppButtonVariant { primary, secondary, ghost, caution, danger }
 
 /// GuiaGo's single button component. Every tappable "primary action"
 /// in the app (complete task, save onboarding step, confirm dialog)
@@ -36,11 +38,21 @@ class AppButton extends StatelessWidget {
       AppButtonVariant.primary => AppColors.primary,
       AppButtonVariant.secondary => AppColors.surfaceMuted,
       AppButtonVariant.ghost => Colors.transparent,
+      AppButtonVariant.caution =>
+        AppColors.accent.withValues(alpha: 0.12),
+      AppButtonVariant.danger => AppColors.error.withValues(alpha: 0.10),
+    };
+    final Color? borderColor = switch (variant) {
+      AppButtonVariant.caution => AppColors.accent.withValues(alpha: 0.4),
+      AppButtonVariant.danger => AppColors.error.withValues(alpha: 0.35),
+      _ => null,
     };
     final Color foreground = switch (variant) {
       AppButtonVariant.primary => AppColors.textOnPrimary,
       AppButtonVariant.secondary => AppColors.textPrimary,
       AppButtonVariant.ghost => AppColors.primary,
+      AppButtonVariant.caution => AppColors.accent,
+      AppButtonVariant.danger => AppColors.error,
     };
 
     return AnimatedOpacity(
@@ -58,6 +70,7 @@ class AppButton extends StatelessWidget {
             disabledBackgroundColor: background,
             disabledForegroundColor: foreground,
             elevation: 0,
+            side: borderColor == null ? null : BorderSide(color: borderColor),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),

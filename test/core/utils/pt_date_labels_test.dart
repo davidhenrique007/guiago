@@ -19,4 +19,14 @@ void main() {
     expect(PtDateLabels.weekdaysShort, hasLength(7));
     expect(PtDateLabels.months, hasLength(12));
   });
+
+  test('time is 24-hour and zero-padded', () {
+    expect(PtDateLabels.time(DateTime(2026, 8, 14, 8, 5)), '08:05');
+    expect(PtDateLabels.time(DateTime(2026, 8, 14, 23, 59)), '23:59');
+  });
+
+  test('dayAndMonthUpper upper-cases the month, accents included', () {
+    expect(PtDateLabels.dayAndMonthUpper(DateTime(2026, 8, 14)), '14 DE AGOSTO');
+    expect(PtDateLabels.dayAndMonthUpper(DateTime(2026, 3, 1)), '1 DE MARÇO');
+  });
 }

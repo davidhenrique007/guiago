@@ -48,6 +48,15 @@ abstract final class PtDateLabels {
   static String longDate(DateTime date) =>
       '${weekdayName(date)}, ${date.day} de ${months[date.month - 1]}';
 
+  /// "08:05" (24-hour, zero-padded).
+  static String time(DateTime date) =>
+      '${date.hour.toString().padLeft(2, '0')}:'
+      '${date.minute.toString().padLeft(2, '0')}';
+
+  /// "14 DE AGOSTO" — the upper-case date used on the alarm screen.
+  static String dayAndMonthUpper(DateTime date) =>
+      '${date.day} DE ${months[date.month - 1].toUpperCase()}';
+
   static String _capitalize(String value) =>
       '${value[0].toUpperCase()}${value.substring(1)}';
 }
