@@ -6,6 +6,7 @@ import '../../../../app/router/app_router.dart';
 import '../../../../design_system/design_system.dart';
 import '../../application/home_controller.dart';
 import '../../domain/home_snapshot.dart';
+import '../widgets/alarm_permission_banner.dart';
 import '../widgets/home_greeting.dart';
 import '../widgets/home_next_task_card.dart';
 import '../widgets/home_progress_card.dart';
@@ -49,6 +50,7 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.md),
             children: <Widget>[
+              const AlarmPermissionBanner(),
               // Pattern-matching, not `.when()` — same convention as
               // AlarmRingController / DashboardScreen.
               switch (snapshotAsync) {

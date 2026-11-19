@@ -121,8 +121,15 @@ class AlarmRingController extends AsyncNotifier<AlarmRingUiState> {
 
   Future<void> snooze() {
     _missTimer?.cancel();
-    final String currentOccurrenceId = _currentState!.occurrence.id;
-    return _resolve(() => _engine.snoozeOccurrence(currentOccurrenceId));
+    final AlarmRingUiState current = _currentState!;
+    final String currentOccurrenceId = current.occurrence.id;
+    final int snoozeMinutes = current.task.defaultSnoozeMinutes;
+    return _resolve(
+      () => _engine.snoozeOccurrence(
+        currentOccurrenceId,
+        snoozeMinutes: snoozeMinutes,
+      ),
+    );
   }
 
   TaskEngine get _engine => ref.read(taskEngineWithSchedulerProvider);
