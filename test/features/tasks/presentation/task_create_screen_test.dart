@@ -9,6 +9,8 @@ import 'package:guiago/core/services/app_database.dart';
 import 'package:guiago/core/services/database_provider.dart';
 import 'package:guiago/features/onboarding/data/drift_settings_repository.dart';
 import 'package:guiago/features/onboarding/domain/settings.dart';
+import 'package:guiago/features/scheduler/application/alarm_permission_prompter.dart';
+import 'package:guiago/features/scheduler/data/alarm_permission_providers.dart';
 import 'package:guiago/features/scheduler/data/scheduler_providers.dart';
 import 'package:guiago/features/scheduler/domain/alarm_notifier.dart';
 import 'package:guiago/features/tasks/data/drift_task_repository.dart';
@@ -42,11 +44,23 @@ class _FakeAlarmNotifier implements AlarmNotifier {
   Future<String?> checkLaunchPayload() async => null;
 }
 
+class _CountingPrompter implements AlarmPermissionPrompter {
+  int calls = 0;
+
+  @override
+  Future<bool> promptIfNeeded() async {
+    calls++;
+    return false;
+  }
+}
+
 void main() {
   late AppDatabase db;
+  late _CountingPrompter prompter;
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
+    prompter = _CountingPrompter();
   });
 
   tearDown(() => db.close());
@@ -87,6 +101,7 @@ void main() {
         overrides: [
           appDatabaseProvider.overrideWithValue(db),
           notificationServiceProvider.overrideWithValue(_FakeAlarmNotifier()),
+          alarmPermissionPrompterProvider.overrideWithValue(prompter),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -123,6 +138,18 @@ void main() {
     final result = await DriftTaskRepository(db).getActiveTasks();
     expect(result.valueOrNull, hasLength(1));
     expect(result.valueOrNull!.single.title, 'Beber água');
+    expect(prompter.calls, 1);
+  });
+
+  testWidgets('does not ask for permissions when the title is invalid', (
+    WidgetTester tester,
+  ) async {
+    await pumpFromHome(tester);
+
+    await tester.tap(find.text('Guardar tarefa'));
+    await tester.pumpAndSettle();
+
+    expect(prompter.calls, 0);
   });
 
   testWidgets('shows the Settings defaults as the selected chips', (

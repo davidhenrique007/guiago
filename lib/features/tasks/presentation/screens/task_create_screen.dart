@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../onboarding/application/settings_controller.dart';
 import '../../../onboarding/domain/settings.dart';
+import '../../../scheduler/data/alarm_permission_providers.dart';
 import '../../../scheduler/data/scheduler_providers.dart';
 import '../../application/tasks_view_state.dart';
 import '../../data/tasks_list_providers.dart';
@@ -206,6 +207,15 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
 // Repõe o estado antes de sair para o botão nunca ficar preso em
 // "loading" se o pop falhar ou for intercetado por outra rota.
     setState(() => _isSaving = false);
+
+    // First task created: this is the moment alarms start to matter, so
+    // ask for the permissions now (once per run, and only if enabled).
+    if (!_isEditing && settings.notificationsEnabled) {
+      final bool asked =
+          await ref.read(alarmPermissionPrompterProvider).promptIfNeeded();
+      if (asked) ref.invalidate(alarmPermissionStatusProvider);
+      if (!mounted) return;
+    }
 
     Navigator.of(context).pop();
   }

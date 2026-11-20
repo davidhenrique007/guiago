@@ -7,6 +7,7 @@ import '../../domain/dashboard_period.dart';
 import '../../domain/dashboard_snapshot.dart';
 import '../widgets/dashboard_period_selector.dart';
 import '../widgets/dashboard_trend_section.dart';
+import '../widgets/objective_card.dart';
 import '../widgets/progress_completion_card.dart';
 import '../widgets/progress_level_card.dart';
 import '../widgets/progress_streak_card.dart';
@@ -70,6 +71,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ProgressLevelCard(snapshot: value),
                       const SizedBox(height: AppSpacing.md),
                       DashboardTrendSection(snapshot: value),
+                      const SizedBox(height: AppSpacing.md),
+                      const ObjectiveCard(),
                     ],
                   ),
                 AsyncError<DashboardSnapshot>() => Padding(

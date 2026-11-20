@@ -5,9 +5,12 @@ import '../../../onboarding/domain/settings.dart';
 
 /// Initial in a circle, the user's name and their main objective.
 class ProfileHeader extends StatelessWidget {
-  const ProfileHeader({required this.settings, super.key});
+  const ProfileHeader({required this.settings, this.onEdit, super.key});
 
   final Settings settings;
+
+  /// Shows an edit button when set.
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +50,15 @@ class ProfileHeader extends StatelessWidget {
             ],
           ),
         ),
+        if (onEdit != null)
+          IconButton(
+            tooltip: 'Editar perfil',
+            onPressed: onEdit,
+            icon: const Icon(
+              Icons.edit_outlined,
+              color: AppColors.textSecondary,
+            ),
+          ),
       ],
     );
   }

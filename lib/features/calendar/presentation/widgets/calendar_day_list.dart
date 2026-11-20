@@ -8,9 +8,12 @@ import '../../domain/calendar_task_item.dart';
 /// The occurrences of the selected day, in the same visual style as
 /// the Home's "Hoje" list.
 class CalendarDayList extends StatelessWidget {
-  const CalendarDayList({required this.items, super.key});
+  const CalendarDayList({required this.items, this.onTap, super.key});
 
   final List<CalendarTaskItem> items;
+
+  /// Called when a card is tapped; when null the cards are not tappable.
+  final ValueChanged<CalendarTaskItem>? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +34,7 @@ class CalendarDayList extends StatelessWidget {
             title: item.title,
             statusLabel: _statusLabel(item.status),
             tone: _tone(item),
+            onTap: onTap == null ? null : () => onTap!(item),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],

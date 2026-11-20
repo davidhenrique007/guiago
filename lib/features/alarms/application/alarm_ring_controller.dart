@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/result/result.dart';
+import '../../onboarding/data/settings_repository_provider.dart';
 import '../../scheduler/data/scheduler_providers.dart';
 import '../../tasks/application/task_engine.dart';
 import '../../tasks/data/task_providers.dart';
@@ -77,7 +78,16 @@ class AlarmRingController extends AsyncNotifier<AlarmRingUiState> {
       throw StateError('Task ${occurrence.taskId} not found');
     }
 
-    await ref.read(ttsServiceProvider).speak(task.title);
+    // Voice reading follows the Profile switch. If settings cannot be
+    // read, keep the default (speak) rather than silence the alarm.
+    final bool ttsEnabled =
+        (await ref.read(settingsRepositoryProvider).getSettings())
+                .valueOrNull
+                ?.ttsEnabled ??
+            true;
+    if (ttsEnabled) {
+      await ref.read(ttsServiceProvider).speak(task.title);
+    }
     _armMissTimer(occurrence);
 
     return AlarmRingUiState(
