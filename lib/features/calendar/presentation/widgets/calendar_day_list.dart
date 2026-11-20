@@ -17,7 +17,7 @@ class CalendarDayList extends StatelessWidget {
     if (items.isEmpty) {
       return const AppEmptyState(
         title: 'Sem tarefas neste dia',
-        message: 'Toca em + para criar uma tarefa.',
+        message: 'As tarefas agendadas para este dia aparecem aqui.',
         icon: Icons.event_available_outlined,
       );
     }

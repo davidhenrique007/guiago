@@ -12,7 +12,7 @@ import '../../features/onboarding/presentation/screens/splash_screen.dart';
 import '../../features/onboarding/presentation/screens/welcome_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/tasks/presentation/screens/task_create_screen.dart';
-import 'app_placeholder_screen.dart';
+import '../../features/tasks/presentation/screens/tasks_screen.dart';
 import 'app_shell.dart';
 
 part 'app_routes.dart';
@@ -64,10 +64,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                 path: AppRoutes.tasks,
                 name: AppRoutes.tasksName,
                 builder: (BuildContext context, GoRouterState state) =>
-                    const AppPlaceholderScreen(
-                  title: 'Tarefas',
-                  icon: Icons.check_box_outlined,
-                ),
+                    const TasksScreen(),
               ),
             ],
           ),
@@ -116,6 +113,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.taskCreateName,
         builder: (BuildContext context, GoRouterState state) =>
             const TaskCreateScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.taskEdit,
+        name: AppRoutes.taskEditName,
+        builder: (BuildContext context, GoRouterState state) =>
+            TaskCreateScreen(taskId: state.pathParameters['taskId']),
       ),
       GoRoute(
         path: AppRoutes.alarm,

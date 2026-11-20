@@ -36,6 +36,9 @@ abstract final class AppRoutes {
   static const String taskCreate = '/tasks/create';
   static const String taskCreateName = 'taskCreate';
 
+  static const String taskEdit = '/tasks/edit/:taskId';
+  static const String taskEditName = 'taskEdit';
+
   static const String alarm = '/alarm/:occurrenceId';
   static const String alarmName = 'alarm';
 }

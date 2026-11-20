@@ -79,8 +79,7 @@ class RecoveryService {
             (TaskOccurrence o) =>
                 o.id != excludeId &&
                 !unresolved.contains(o.id) &&
-                OverdueClassifier.classify(o, now) ==
-                    RecoveryAction.markMissed,
+                OverdueClassifier.classify(o, now) == RecoveryAction.markMissed,
           )
           .toList();
       if (expired.isEmpty) break;

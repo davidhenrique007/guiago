@@ -118,6 +118,151 @@ class TaskEngine {
 
   Future<Result<void>> deleteTask(String taskId) => _tasks.deleteTask(taskId);
 
+  /// Edits a task the user already created (Fase 8). Unlike
+  /// [updateTask], which only persists the row, this also keeps the
+  /// task's live occurrence and its native alarm in sync:
+  ///
+  /// * the task row is saved first (so the scheduler reads the new
+  ///   title when it re-arms the alarm);
+  /// * if the task has a live occurrence still in `scheduled` or
+  ///   `snoozed`, its tolerance (and `scheduledAt`, when
+  ///   [scheduledAt] is given) is updated and the alarm is cancelled
+  ///   and re-armed;
+  /// * an occurrence already `triggered` is left alone — the user is
+  ///   looking at it right now;
+  /// * a task with no live occurrence only has its own data changed.
+  ///
+  /// A new [recurrenceRule] only affects occurrences generated after
+  /// the current one resolves (master spec §12).
+  Future<Result<Task>> editTask({
+    required String taskId,
+    required String title,
+    String? description,
+    required TaskPriority priority,
+    required RecurrenceRule recurrenceRule,
+    required int toleranceMinutes,
+    required int snoozeMinutes,
+    DateTime? scheduledAt,
+  }) async {
+    final String trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) {
+      return const Fail<Task>(ValidationFailure('Task title is required'));
+    }
+
+    final Result<Task?> taskResult = await _tasks.getTask(taskId);
+    if (taskResult case Fail<Task?>(:final failure)) {
+      return Fail<Task>(failure);
+    }
+    final Task? current = taskResult.valueOrNull;
+    if (current == null || current.isArchived) {
+      return Fail<Task>(ValidationFailure('Task $taskId not found'));
+    }
+
+    final String? trimmedDescription = description?.trim();
+    final Task updated = Task(
+      id: current.id,
+      title: trimmedTitle,
+      description: (trimmedDescription == null || trimmedDescription.isEmpty)
+          ? null
+          : trimmedDescription,
+      priority: priority,
+      recurrenceRule: recurrenceRule,
+      defaultToleranceMinutes: toleranceMinutes,
+      defaultSnoozeMinutes: snoozeMinutes,
+      createdAt: current.createdAt,
+      updatedAt: DateTime.now(),
+      isArchived: false,
+    );
+    final Result<Task> saveResult = await _tasks.saveTask(updated);
+    if (saveResult case Fail<Task>(:final failure)) {
+      return Fail<Task>(failure);
+    }
+
+    final Result<TaskOccurrence?> liveResult =
+        await _occurrences.getActiveOccurrenceForTask(taskId);
+    final TaskOccurrence? live = liveResult.valueOrNull;
+    if (live != null &&
+        (live.status == OccurrenceStatus.scheduled ||
+            live.status == OccurrenceStatus.snoozed)) {
+      final TaskOccurrence changed = live.copyWith(
+        scheduledAt: scheduledAt ?? live.scheduledAt,
+        toleranceMinutes: toleranceMinutes,
+      );
+      final Result<TaskOccurrence> occurrenceSave =
+          await _occurrences.saveOccurrence(changed);
+      if (occurrenceSave case Fail<TaskOccurrence>(:final failure)) {
+        return Fail<Task>(failure);
+      }
+      await _alarmScheduler?.cancelOccurrence(live.id);
+      await _alarmScheduler?.scheduleOccurrence(changed);
+    }
+
+    return Success<Task>(updated);
+  }
+
+  /// "Apagar" for the user (Fase 8). It is deliberately NOT a
+  /// physical delete: events, alarm records and score entries all
+  /// reference the task's occurrences, so removing the row would
+  /// orphan the history the Performance feature relies on. Instead:
+  ///
+  /// 1. the task is archived (no more recurrences are generated and
+  ///    it leaves every active list);
+  /// 2. every `scheduled`/`snoozed` occurrence is moved to
+  ///    `cancelled` through [OccurrenceStateMachine] and its native
+  ///    alarm is cancelled;
+  /// 3. an occurrence already `triggered` is left to be resolved by
+  ///    the user — only its pending alarm is cancelled.
+  ///
+  /// Resolved occurrences (completed/declined/missed) are untouched,
+  /// so the history and the score stay intact.
+  Future<Result<void>> removeTask(String taskId) async {
+    final Result<Task?> taskResult = await _tasks.getTask(taskId);
+    if (taskResult case Fail<Task?>(:final failure)) {
+      return Fail<void>(failure);
+    }
+    if (taskResult.valueOrNull == null) {
+      return Fail<void>(ValidationFailure('Task $taskId not found'));
+    }
+
+    final Result<void> archiveResult = await _tasks.archiveTask(taskId);
+    if (archiveResult case Fail<void>(:final failure)) {
+      return Fail<void>(failure);
+    }
+
+    final Result<List<TaskOccurrence>> occurrencesResult =
+        await _occurrences.getOccurrencesForTask(taskId);
+    if (occurrencesResult case Fail<List<TaskOccurrence>>(:final failure)) {
+      return Fail<void>(failure);
+    }
+
+    for (final TaskOccurrence occurrence in occurrencesResult.valueOrNull!) {
+      switch (occurrence.status) {
+        case OccurrenceStatus.scheduled:
+        case OccurrenceStatus.snoozed:
+          final Result<OccurrenceStatus> transition =
+              OccurrenceStateMachine.transition(
+            occurrence.status,
+            OccurrenceStatus.cancelled,
+          );
+          if (transition.isFailure) continue;
+          await _occurrences.saveOccurrence(
+            occurrence.copyWith(status: OccurrenceStatus.cancelled),
+          );
+          await _recordEvent(occurrence, OccurrenceStatus.cancelled);
+          await _alarmScheduler?.cancelOccurrence(occurrence.id);
+        case OccurrenceStatus.triggered:
+          await _alarmScheduler?.cancelOccurrence(occurrence.id);
+        case OccurrenceStatus.completed:
+        case OccurrenceStatus.declined:
+        case OccurrenceStatus.missed:
+        case OccurrenceStatus.cancelled:
+          break;
+      }
+    }
+
+    return const Success<void>(null);
+  }
+
   /// Marks the occurrence triggered — the alarm has fired and the
   /// user is looking at it. Called by `AlarmRingController` when the
   /// alarm screen opens (Fase 4).

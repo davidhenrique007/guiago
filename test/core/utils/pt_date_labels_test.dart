@@ -26,7 +26,13 @@ void main() {
   });
 
   test('dayAndMonthUpper upper-cases the month, accents included', () {
-    expect(PtDateLabels.dayAndMonthUpper(DateTime(2026, 8, 14)), '14 DE AGOSTO');
-    expect(PtDateLabels.dayAndMonthUpper(DateTime(2026, 3, 1)), '1 DE MARÇO');
+    expect(
+      PtDateLabels.dayAndMonthUpper(DateTime(2026, 8, 14)),
+      '14 DE AGOSTO',
+    );
+    expect(
+      PtDateLabels.dayAndMonthUpper(DateTime(2026, 3, 1)),
+      '1 DE MARÇO',
+    );
   });
 }

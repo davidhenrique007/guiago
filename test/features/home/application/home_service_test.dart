@@ -77,7 +77,11 @@ void main() {
       await tasks.saveTask(task('t1', 'Beber água'));
       await occurrences.saveOccurrence(
         occurrence(
-            'o1', 't1', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+          'o1',
+          't1',
+          DateTime(2026, 3, 15, 9),
+          OccurrenceStatus.scheduled,
+        ),
       );
 
       final result = await service.load(now: now);
@@ -93,7 +97,11 @@ void main() {
       await tasks.saveTask(task('t1', 'Tarefa viva'));
       await occurrences.saveOccurrence(
         occurrence(
-            'o1', 't1', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+          'o1',
+          't1',
+          DateTime(2026, 3, 15, 9),
+          OccurrenceStatus.scheduled,
+        ),
       );
       await occurrences.saveOccurrence(
         occurrence(
@@ -106,7 +114,11 @@ void main() {
       // 't2' never saved — its task was deleted after being scheduled.
       await occurrences.saveOccurrence(
         occurrence(
-            'o3', 't2', DateTime(2026, 3, 15, 11), OccurrenceStatus.scheduled,),
+          'o3',
+          't2',
+          DateTime(2026, 3, 15, 11),
+          OccurrenceStatus.scheduled,
+        ),
       );
 
       final result = await service.load(now: now);
@@ -129,7 +141,11 @@ void main() {
       );
       await occurrences.saveOccurrence(
         occurrence(
-            'o2', 't2', DateTime(2026, 3, 15, 9), OccurrenceStatus.scheduled,),
+          'o2',
+          't2',
+          DateTime(2026, 3, 15, 9),
+          OccurrenceStatus.scheduled,
+        ),
       );
 
       final result = await service.load(now: now);
@@ -168,7 +184,11 @@ void main() {
       );
       await occurrences.saveOccurrence(
         occurrence(
-            'o2', 't2', DateTime(2026, 3, 15, 1), OccurrenceStatus.scheduled,),
+          'o2',
+          't2',
+          DateTime(2026, 3, 15, 1),
+          OccurrenceStatus.scheduled,
+        ),
       );
 
       final result = await service.load(now: now);

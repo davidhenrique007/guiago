@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../design_system/design_system.dart';
+import 'app_router.dart';
+import 'shell_swipe_detector.dart';
 
 /// Frame around the five main destinations: the active branch on top,
 /// the bottom bar below. Each branch keeps its own navigation stack
@@ -20,11 +22,32 @@ class AppShell extends StatelessWidget {
     AppBottomNavItem(label: 'Perfil', icon: Icons.person_outline),
   ];
 
+  /// The root screen of each tab. Swiping between tabs only works on
+  /// these: on a nested screen (e.g. Insights) it would throw the user
+  /// out of where they are.
+  static const List<String> _rootPaths = <String>[
+    AppRoutes.home,
+    AppRoutes.tasks,
+    AppRoutes.calendar,
+    AppRoutes.progress,
+    AppRoutes.profile,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final bool atTabRoot = _rootPaths.contains(
+      GoRouterState.of(context).matchedLocation,
+    );
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: navigationShell,
+      body: ShellSwipeDetector(
+        currentIndex: navigationShell.currentIndex,
+        itemCount: items.length,
+        enabled: atTabRoot,
+        onChanged: navigationShell.goBranch,
+        child: navigationShell,
+      ),
       bottomNavigationBar: AppBottomNav(
         items: items,
         currentIndex: navigationShell.currentIndex,

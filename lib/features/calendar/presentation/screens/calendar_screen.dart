@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/app_router.dart';
 import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
 import '../../application/calendar_controller.dart';
@@ -35,21 +33,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         elevation: 0,
         title: Text('Calendário', style: AppTypography.titleLarge),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        tooltip: 'Nova tarefa',
-        onPressed: () async {
-          await context.pushNamed(AppRoutes.taskCreateName);
-          // The new task may fall on the day being shown — reload.
-          ref.read(calendarControllerProvider(_selectedDay).notifier).refresh();
-        },
-        child: const Icon(Icons.add, color: AppColors.textOnPrimary),
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async {
-            ref.read(calendarControllerProvider(_selectedDay).notifier).refresh();
+            ref
+                .read(calendarControllerProvider(_selectedDay).notifier)
+                .refresh();
             await ref.read(calendarControllerProvider(_selectedDay).future);
           },
           child: ListView(
@@ -57,7 +47,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             children: <Widget>[
               CalendarWeekStrip(
                 selectedDay: _selectedDay,
-                onSelected: (DateTime day) => setState(() => _selectedDay = day),
+                onSelected: (DateTime day) =>
+                    setState(() => _selectedDay = day),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(

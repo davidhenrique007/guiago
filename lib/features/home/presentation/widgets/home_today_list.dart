@@ -4,19 +4,30 @@ import '../../../../design_system/design_system.dart';
 import '../../../tasks/domain/occurrence_status.dart';
 import '../../../tasks/domain/task_priority.dart';
 import '../../domain/today_task_item.dart';
+import 'home_task_action_buttons.dart';
 
 /// Today's full list of occurrences (master spec §22).
 class HomeTodayList extends StatelessWidget {
-  const HomeTodayList({required this.items, super.key});
+  const HomeTodayList({
+    required this.items,
+    this.onComplete,
+    this.onSnooze,
+    super.key,
+  });
 
   final List<TodayTaskItem> items;
+
+  /// Quick actions; when null the list shows no buttons.
+  final ValueChanged<String>? onComplete;
+  final ValueChanged<String>? onSnooze;
 
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
       return const AppEmptyState(
         title: 'Sem tarefas para hoje',
-        message: 'Cria uma tarefa para começares a organizar o teu dia.',
+        message:
+            'Cria uma tarefa na aba Tarefas para começares a organizar o teu dia.',
         icon: Icons.event_available_outlined,
       );
     }
@@ -26,6 +37,12 @@ class HomeTodayList extends StatelessWidget {
       children: <Widget>[
         for (final TodayTaskItem item in items) ...<Widget>[
           _TodayTaskTile(item: item),
+          if (onComplete != null && onSnooze != null && !item.isResolved)
+            HomeTaskActionButtons(
+              canSnooze: !item.scheduledAt.isAfter(DateTime.now()),
+              onComplete: () => onComplete!(item.occurrenceId),
+              onSnooze: () => onSnooze!(item.occurrenceId),
+            ),
           const SizedBox(height: AppSpacing.sm),
         ],
       ],

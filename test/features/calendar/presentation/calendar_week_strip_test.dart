@@ -6,7 +6,8 @@ void main() {
   group('weekOf', () {
     test('runs Monday to Sunday around the given day', () {
       // 2026-08-14 is a Friday.
-      final List<DateTime> week = CalendarWeekStrip.weekOf(DateTime(2026, 8, 14));
+      final List<DateTime> week =
+          CalendarWeekStrip.weekOf(DateTime(2026, 8, 14));
 
       expect(week, hasLength(7));
       expect(week.first, DateTime(2026, 8, 10));
@@ -17,7 +18,8 @@ void main() {
 
     test('a Sunday belongs to the week that started the Monday before', () {
       // 2026-03-01 is a Sunday.
-      final List<DateTime> week = CalendarWeekStrip.weekOf(DateTime(2026, 3, 1));
+      final List<DateTime> week =
+          CalendarWeekStrip.weekOf(DateTime(2026, 3, 1));
 
       expect(week.first, DateTime(2026, 2, 23));
       expect(week.last, DateTime(2026, 3, 1));
@@ -41,7 +43,10 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel('Sexta-feira 14, seleccionado'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Sexta-feira 14, seleccionado'),
+      findsOneWidget,
+    );
     expect(find.bySemanticsLabel('Sábado 15'), findsOneWidget);
 
     await tester.tap(find.text('12'));

@@ -88,8 +88,9 @@ class ProfileScreen extends ConsumerWidget {
                         const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                     child: AppErrorState(
                       message: 'Não foi possível carregar o perfil.',
-                      onRetry: () =>
-                          ref.read(settingsControllerProvider.notifier).refresh(),
+                      onRetry: () => ref
+                          .read(settingsControllerProvider.notifier)
+                          .refresh(),
                     ),
                   ),
                 _ => const Padding(

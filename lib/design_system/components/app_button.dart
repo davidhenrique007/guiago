@@ -38,8 +38,7 @@ class AppButton extends StatelessWidget {
       AppButtonVariant.primary => AppColors.primary,
       AppButtonVariant.secondary => AppColors.surfaceMuted,
       AppButtonVariant.ghost => Colors.transparent,
-      AppButtonVariant.caution =>
-        AppColors.accent.withValues(alpha: 0.12),
+      AppButtonVariant.caution => AppColors.accent.withValues(alpha: 0.12),
       AppButtonVariant.danger => AppColors.error.withValues(alpha: 0.10),
     };
     final Color? borderColor = switch (variant) {

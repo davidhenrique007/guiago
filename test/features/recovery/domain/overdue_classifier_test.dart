@@ -34,7 +34,8 @@ void main() {
       expect(OverdueClassifier.classify(o, now), RecoveryAction.reschedule);
     });
 
-    test('a scheduled occurrence past its time but inside tolerance is '
+    test(
+        'a scheduled occurrence past its time but inside tolerance is '
         'surfaced now', () {
       final TaskOccurrence o = occurrence(
         status: OccurrenceStatus.scheduled,
@@ -82,8 +83,7 @@ void main() {
       expect(OverdueClassifier.classify(o, now), RecoveryAction.markMissed);
     });
 
-    test('a snoozed-then-scheduled occurrence ignores its old triggeredAt',
-        () {
+    test('a snoozed-then-scheduled occurrence ignores its old triggeredAt', () {
       final TaskOccurrence o = occurrence(
         status: OccurrenceStatus.scheduled,
         scheduledAt: now.add(const Duration(minutes: 10)),
