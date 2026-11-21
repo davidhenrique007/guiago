@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../onboarding/domain/settings.dart';
+import '../../../scheduler/domain/notification_sound.dart';
 
 /// The user's preferences. Every row is editable: switches change on
 /// tap, the others open a picker. A row whose callback is null is
@@ -10,6 +11,8 @@ class ProfilePreferencesCard extends StatelessWidget {
   const ProfilePreferencesCard({
     required this.settings,
     this.onNotificationsChanged,
+    this.onSoundTap,
+    this.onVibrationChanged,
     this.onTtsChanged,
     this.onSnoozeTap,
     this.onToleranceTap,
@@ -20,6 +23,8 @@ class ProfilePreferencesCard extends StatelessWidget {
 
   final Settings settings;
   final ValueChanged<bool>? onNotificationsChanged;
+  final VoidCallback? onSoundTap;
+  final ValueChanged<bool>? onVibrationChanged;
   final ValueChanged<bool>? onTtsChanged;
   final VoidCallback? onSnoozeTap;
   final VoidCallback? onToleranceTap;
@@ -32,13 +37,24 @@ class ProfilePreferencesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('PREFERÊNCIAS', style: AppTypography.label),
+          Text('NOTIFICAÇÕES', style: AppTypography.label),
           const SizedBox(height: AppSpacing.sm),
           _ValueRow(
             label: 'Notificações',
             value: settings.notificationsEnabled ? 'Ativadas' : 'Desativadas',
             switchValue: settings.notificationsEnabled,
             onSwitch: onNotificationsChanged,
+          ),
+          _ValueRow(
+            label: 'Som da notificação',
+            value: NotificationSound.fromKey(settings.notificationSound).label,
+            onTap: onSoundTap,
+          ),
+          _ValueRow(
+            label: 'Vibração',
+            value: settings.vibrationEnabled ? 'Ligada' : 'Desligada',
+            switchValue: settings.vibrationEnabled,
+            onSwitch: onVibrationChanged,
           ),
           _ValueRow(
             label: 'Snooze padrão',

@@ -58,8 +58,26 @@ Telemóvel: ____________  Android: ____  Build: `flutter run --release`
 - [ ] Alterar Snooze e Tolerância: novas tarefas usam os novos valores.
 - [ ] Início/Fim do dia: fim anterior ao início é recusado.
 
+## 7. Som, vibração e Notificações (Fase 9, Lote H)
+- [ ] Perfil → Som da notificação: tocar no ▶ de cada som **toca** (volume
+      das notificações ligado, permissão de notificações dada).
+- [ ] Escolher "GuiaGo — Alerta", criar tarefa para daqui a 2 min: toca **esse** som.
+- [ ] Repetir com Suave, Despertar, Som do sistema e Sem som (silêncio).
+- [ ] Mudar o som com uma tarefa já agendada: ao disparar usa o **novo** som.
+- [ ] Vibração desligada: o alarme toca sem vibrar; ligada: vibra.
+- [ ] Notificações desligadas: tarefa agendada **não** notifica; ligar de novo
+      e criar/aguardar: volta a notificar (as pendentes são rearmadas).
+- [ ] Definições do Android → Apps → GuiaGo → Notificações: aparecem canais
+      por combinação (ex.: "GuiaGo — GuiaGo — Alerta (com vibração)").
+- [ ] Modo "Não incomodar" / volume de notificações a zero: anotar o
+      comportamento (é do Android, não da app).
+
 ## Limitações conhecidas (MVP)
-- Notificações (interruptor) e janela do dia ficam guardadas mas **ainda não**
-  alteram o agendamento. A Voz (TTS) já é respeitada.
+- A janela do dia (Início/Fim) fica guardada mas **ainda não** altera o
+  agendamento. A Voz (TTS), o som, a vibração e o interruptor de Notificações já são respeitados.
+- O som e a vibração pertencem ao *canal* Android e não mudam depois de o canal
+  existir: por isso há um canal por combinação. Canais antigos ficam listados
+  nas definições do sistema.
+- Os 3 sons GuiaGo são tons simples gerados (substituíveis: ver `NotificationSound`).
 - O alarme é uma notificação (ADR-008): não abre sozinho sobre o ecrã bloqueado.
 - Vista de Ano no Calendário e rotinas ligadas a objetivos ficam pós-MVP.

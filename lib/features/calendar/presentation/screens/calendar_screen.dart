@@ -1,24 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/refresh_task_views.dart';
+import '../../../../app/router/app_router.dart';
 import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
 import '../../application/calendar_controller.dart';
 import '../../application/calendar_month_controller.dart';
+import '../../application/calendar_year_controller.dart';
 import '../../domain/calendar_day_snapshot.dart';
 import '../../domain/calendar_month_snapshot.dart';
 import '../../domain/calendar_task_item.dart';
 import '../../domain/calendar_view_mode.dart';
+import '../../domain/calendar_year_snapshot.dart';
 import '../widgets/calendar_day_list.dart';
+import '../widgets/calendar_day_navigator.dart';
 import '../widgets/calendar_month_grid.dart';
 import '../widgets/calendar_view_selector.dart';
 import '../widgets/calendar_week_strip.dart';
+import '../widgets/calendar_year_grid.dart';
 import '../widgets/task_detail_sheet.dart';
 
-/// The Calendar tab: a week strip or a month grid, and the occurrences
-/// of the selected day below it. Read-only — tasks are created and
-/// edited in the Tasks tab. Purely a view over [CalendarController]
-/// and [CalendarMonthController].
+/// The Calendar tab, with three views:
+/// - Dia: the week strip, day arrows and the selected day's tasks;
+/// - Mês: the month grid and the selected day's tasks;
+/// - Ano: the twelve months, to plan ahead (tapping one opens it in Mês).
+///
+/// A task can be created for the selected day (today or later) with
+/// "Nova tarefa"; it opens the same form as the Tasks tab with that date
+/// filled in. Tapping a task opens its detail; editing and deleting stay
+/// in the Tasks tab.
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
@@ -28,7 +40,7 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late DateTime _selectedDay = CalendarController.keyFor(DateTime.now());
-  CalendarViewMode _view = CalendarViewMode.week;
+  CalendarViewMode _view = CalendarViewMode.day;
 
   /// Moves to the previous/next month, keeping the day of month (or
   /// the last day of the target month when it is shorter).
@@ -47,8 +59,59 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     });
   }
 
+  void _shiftDay(int delta) {
+    setState(() {
+      _selectedDay = DateTime(
+        _selectedDay.year,
+        _selectedDay.month,
+        _selectedDay.day + delta,
+      );
+    });
+  }
+
+  /// Moves to the same month/day of another year (clamped, so 29 Feb
+  /// becomes 28 Feb in a common year).
+  void _shiftYear(int delta) {
+    final DateTime target = DateTime(
+      _selectedDay.year + delta,
+      _selectedDay.month,
+    );
+    final int lastDay = CalendarMonthGrid.daysInMonth(target);
+    setState(() {
+      _selectedDay = DateTime(
+        target.year,
+        target.month,
+        _selectedDay.day > lastDay ? lastDay : _selectedDay.day,
+      );
+    });
+  }
+
+  /// Opens a month from the year view: the month view on the same day
+  /// number when it is the current month, otherwise on the 1st.
+  void _openMonth(DateTime firstOfMonth) {
+    final DateTime today = CalendarController.keyFor(DateTime.now());
+    final bool isCurrent =
+        firstOfMonth.year == today.year && firstOfMonth.month == today.month;
+    setState(() {
+      _selectedDay = isCurrent ? today : firstOfMonth;
+      _view = CalendarViewMode.month;
+    });
+  }
+
+  bool get _canCreateForSelectedDay =>
+      !_selectedDay.isBefore(CalendarController.keyFor(DateTime.now()));
+
+  Future<void> _createTask() async {
+    await context.pushNamed(AppRoutes.taskCreateName, extra: _selectedDay);
+    if (!mounted) return;
+    refreshTaskViews(ref);
+  }
+
   void _refresh() {
     ref.read(calendarControllerProvider(_selectedDay).notifier).refresh();
+    ref
+        .read(calendarYearControllerProvider(_selectedDay.year).notifier)
+        .refresh();
     ref
         .read(
           calendarMonthControllerProvider(
@@ -87,48 +150,110 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     setState(() => _view = mode),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (_view == CalendarViewMode.week)
-                CalendarWeekStrip(
-                  selectedDay: _selectedDay,
-                  onSelected: (DateTime day) =>
-                      setState(() => _selectedDay = day),
-                )
-              else
-                _monthGrid(),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                PtDateLabels.longDate(_selectedDay),
-                style: AppTypography.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              // Pattern-matching, not `.when()` — same convention as
-              // HomeScreen / DashboardScreen.
-              switch (snapshotAsync) {
-                AsyncData<CalendarDaySnapshot>(:final value) => CalendarDayList(
-                    items: value.items,
-                    onTap: (CalendarTaskItem item) => TaskDetailSheet.show(
-                      context,
-                      occurrenceId: item.occurrenceId,
-                      title: item.title,
-                    ),
-                  ),
-                AsyncError<CalendarDaySnapshot>() => Padding(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                    child: AppErrorState(
-                      message: 'Não foi possível carregar o calendário.',
-                      onRetry: _refresh,
-                    ),
-                  ),
-                _ => const Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                    child: AppLoadingState(),
-                  ),
-              },
+              ..._body(snapshotAsync),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  List<Widget> _body(AsyncValue<CalendarDaySnapshot> snapshotAsync) {
+    if (_view == CalendarViewMode.year) return <Widget>[_yearGrid()];
+
+    return <Widget>[
+      if (_view == CalendarViewMode.day) ...<Widget>[
+        CalendarWeekStrip(
+          selectedDay: _selectedDay,
+          onSelected: (DateTime day) => setState(() => _selectedDay = day),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        CalendarDayNavigator(
+          day: _selectedDay,
+          onPrevious: () => _shiftDay(-1),
+          onNext: () => _shiftDay(1),
+        ),
+      ] else ...<Widget>[
+        _monthGrid(),
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          PtDateLabels.longDate(_selectedDay),
+          style: AppTypography.bodyMedium,
+        ),
+      ],
+      const SizedBox(height: AppSpacing.md),
+      if (_canCreateForSelectedDay) ...<Widget>[
+        AppButton(
+          label: 'Nova tarefa',
+          icon: Icons.add,
+          onPressed: _createTask,
+        ),
+        const SizedBox(height: AppSpacing.md),
+      ],
+      // Pattern-matching, not `.when()` — same convention as
+      // HomeScreen / DashboardScreen.
+      switch (snapshotAsync) {
+        AsyncData<CalendarDaySnapshot>(:final value) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (value.items.isNotEmpty) ...<Widget>[
+                Text(
+                  'Tarefas do dia (${value.items.length})',
+                  style: AppTypography.titleMedium,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              CalendarDayList(
+                items: value.items,
+                onTap: (CalendarTaskItem item) => TaskDetailSheet.show(
+                  context,
+                  occurrenceId: item.occurrenceId,
+                  title: item.title,
+                ),
+              ),
+            ],
+          ),
+        AsyncError<CalendarDaySnapshot>() => Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+            child: AppErrorState(
+              message: 'Não foi possível carregar o calendário.',
+              onRetry: _refresh,
+            ),
+          ),
+        _ => const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+            child: AppLoadingState(),
+          ),
+      },
+    ];
+  }
+
+  Widget _yearGrid() {
+    final AsyncValue<CalendarYearSnapshot> yearAsync = ref.watch(
+      calendarYearControllerProvider(_selectedDay.year),
+    );
+    // While the counts load (or if they fail) the months still work.
+    final Map<int, int> counts = switch (yearAsync) {
+      AsyncData<CalendarYearSnapshot>(:final value) => value.taskCountByMonth,
+      _ => const <int, int>{},
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        CalendarYearGrid(
+          year: _selectedDay.year,
+          taskCountByMonth: counts,
+          onMonthSelected: _openMonth,
+          onPreviousYear: () => _shiftYear(-1),
+          onNextYear: () => _shiftYear(1),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          'Escolhe um mês para ver os dias e planear tarefas.',
+          textAlign: TextAlign.center,
+          style: AppTypography.bodyMedium,
+        ),
+      ],
     );
   }
 

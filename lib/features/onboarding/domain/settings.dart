@@ -19,6 +19,11 @@ sealed class Settings with _$Settings {
     required int defaultSnoozeMinutes,
     required int defaultToleranceMinutes,
     required bool onboardingCompleted,
+
+    /// Key of a `NotificationSound` (kept as text so this model does not
+    /// depend on the scheduler feature). Unknown keys mean "system".
+    @Default('system') String notificationSound,
+    @Default(true) bool vibrationEnabled,
   }) = _Settings;
 
   const Settings._();

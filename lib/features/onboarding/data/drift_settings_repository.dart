@@ -46,6 +46,8 @@ class DriftSettingsRepository implements SettingsRepository {
               defaultToleranceMinutes:
                   Value<int>(settings.defaultToleranceMinutes),
               onboardingCompleted: Value<bool>(settings.onboardingCompleted),
+              notificationSound: Value<String>(settings.notificationSound),
+              vibrationEnabled: Value<bool>(settings.vibrationEnabled),
             ),
           );
       return const Success<void>(null);
@@ -66,5 +68,7 @@ class DriftSettingsRepository implements SettingsRepository {
         defaultSnoozeMinutes: row.defaultSnoozeMinutes,
         defaultToleranceMinutes: row.defaultToleranceMinutes,
         onboardingCompleted: row.onboardingCompleted,
+        notificationSound: row.notificationSound,
+        vibrationEnabled: row.vibrationEnabled,
       );
 }

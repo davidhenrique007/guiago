@@ -10,10 +10,15 @@ import '../application/scheduler_engine.dart';
 import '../domain/alarm_notifier.dart';
 import '../domain/alarm_repository.dart';
 import '../infrastructure/notification_service.dart';
+import 'alarm_preferences_providers.dart';
 import 'drift_alarm_repository.dart';
 
 final Provider<AlarmNotifier> notificationServiceProvider =
-    Provider<AlarmNotifier>((ref) => NotificationService());
+    Provider<AlarmNotifier>(
+  (ref) => NotificationService(
+    preferences: ref.watch(alarmPreferencesSourceProvider),
+  ),
+);
 
 final Provider<AlarmRepository> alarmRepositoryProvider =
     Provider<AlarmRepository>((ref) {

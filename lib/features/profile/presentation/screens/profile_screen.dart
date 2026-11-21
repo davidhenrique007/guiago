@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,11 +10,14 @@ import '../../../../design_system/design_system.dart';
 import '../../../home/application/home_controller.dart';
 import '../../../onboarding/application/settings_controller.dart';
 import '../../../onboarding/domain/settings.dart';
+import '../../../scheduler/data/alarm_preferences_providers.dart';
+import '../../../scheduler/domain/notification_sound.dart';
 import '../../../tasks/presentation/widgets/task_create_options.dart';
 import '../widgets/profile_edit_sheet.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/profile_minutes_picker.dart';
 import '../widgets/profile_preferences_card.dart';
+import '../widgets/profile_sound_picker.dart';
 
 /// The Perfil tab: who the user is (editable), the link to Insights
 /// and the preferences (editable). Changes go through
@@ -21,12 +26,15 @@ class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   /// Saves a change and tells the user if it failed. The Home shows the
-  /// user's name, so it is reloaded after a successful save.
+  /// user's name, so it is reloaded after a successful save. With
+  /// [affectsAlarms] the alarms already scheduled are re-armed (or
+  /// cancelled, when notifications are off) so the change applies to them.
   Future<void> _save(
     BuildContext context,
     WidgetRef ref,
-    Settings Function(Settings current) change,
-  ) async {
+    Settings Function(Settings current) change, {
+    bool affectsAlarms = false,
+  }) async {
     final Result<void> result =
         await ref.read(settingsControllerProvider.notifier).saveChange(change);
     if (!context.mounted) return;
@@ -37,6 +45,42 @@ class ProfileScreen extends ConsumerWidget {
       return;
     }
     ref.invalidate(homeControllerProvider);
+    if (affectsAlarms) {
+      final bool enabled = switch (ref.read(settingsControllerProvider)) {
+        AsyncData<Settings>(:final value) => value.notificationsEnabled,
+        _ => true,
+      };
+      unawaited(
+        ref
+            .read(alarmPreferencesApplierProvider)
+            .apply(notificationsEnabled: enabled),
+      );
+    }
+  }
+
+  Future<void> _pickSound(
+    BuildContext context,
+    WidgetRef ref,
+    Settings settings,
+  ) async {
+    final NotificationSound? sound = await ProfileSoundPicker.show(
+      context,
+      selected: NotificationSound.fromKey(settings.notificationSound),
+      onPreview: (NotificationSound s) async {
+        // Hear it with the vibration setting the alarm will use.
+        await ref.read(alarmSoundPreviewerProvider).preview(
+              s,
+              vibration: settings.vibrationEnabled,
+            );
+      },
+    );
+    if (sound == null || !context.mounted) return;
+    await _save(
+      context,
+      ref,
+      (Settings s) => s.copyWith(notificationSound: sound.key),
+      affectsAlarms: true,
+    );
   }
 
   Future<void> _editProfile(
@@ -185,6 +229,14 @@ class ProfileScreen extends ConsumerWidget {
                           ref,
                           (Settings s) =>
                               s.copyWith(notificationsEnabled: enabled),
+                          affectsAlarms: true,
+                        ),
+                        onSoundTap: () => _pickSound(context, ref, value),
+                        onVibrationChanged: (bool enabled) => _save(
+                          context,
+                          ref,
+                          (Settings s) => s.copyWith(vibrationEnabled: enabled),
+                          affectsAlarms: true,
                         ),
                         onTtsChanged: (bool enabled) => _save(
                           context,

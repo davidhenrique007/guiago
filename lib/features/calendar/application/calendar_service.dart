@@ -9,6 +9,7 @@ import '../domain/calendar_day_snapshot.dart';
 import '../domain/calendar_month_snapshot.dart';
 import '../domain/calendar_task_detail.dart';
 import '../domain/calendar_task_item.dart';
+import '../domain/calendar_year_snapshot.dart';
 
 /// Read-only assembler of a [CalendarDaySnapshot] — same shape as
 /// `HomeService`. Shows only occurrences that are already persisted:
@@ -93,6 +94,32 @@ class CalendarService {
     }
     return Success<CalendarMonthSnapshot>(
       CalendarMonthSnapshot(month: monthStart, taskCountByDay: counts),
+    );
+  }
+
+  /// Per-month task counts for [year]. One range query, only counts.
+  Future<Result<CalendarYearSnapshot>> loadYear(int year) async {
+    final DateTime yearStart = DateTime(year);
+    final DateTime yearEnd =
+        DateTime(year + 1).subtract(const Duration(microseconds: 1));
+
+    final Result<List<TaskOccurrence>> result =
+        await _occurrences.getOccurrencesInRange(yearStart, yearEnd);
+    if (result.isFailure) {
+      return Fail<CalendarYearSnapshot>(result.failureOrNull!);
+    }
+
+    final Map<int, int> counts = <int, int>{};
+    for (final TaskOccurrence occurrence in result.valueOrNull!) {
+      if (occurrence.status == OccurrenceStatus.cancelled) continue;
+      counts.update(
+        occurrence.scheduledAt.month,
+        (int value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    return Success<CalendarYearSnapshot>(
+      CalendarYearSnapshot(year: year, taskCountByMonth: counts),
     );
   }
 

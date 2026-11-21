@@ -7,7 +7,7 @@ import 'package:guiago/core/services/database_provider.dart';
 import 'package:guiago/features/calendar/presentation/screens/calendar_screen.dart';
 
 void main() {
-  testWidgets('the Calendar does not offer to create a task', (
+  testWidgets('the Calendar creates tasks with a button, never with a FAB', (
     WidgetTester tester,
   ) async {
     final AppDatabase db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -22,5 +22,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.text('Nova tarefa'), findsOneWidget);
   });
 }

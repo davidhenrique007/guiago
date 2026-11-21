@@ -43,6 +43,13 @@ class SettingsTable extends Table {
   BoolColumn get onboardingCompleted =>
       boolean().withDefault(const Constant(false))();
 
+  /// Fase 9: which alarm sound (a `NotificationSound.key`) and whether
+  /// the alarm vibrates.
+  TextColumn get notificationSound =>
+      text().withDefault(const Constant('system'))();
+  BoolColumn get vibrationEnabled =>
+      boolean().withDefault(const Constant(true))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -274,7 +281,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -299,6 +306,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(scoresTable);
             await m.createTable(levelsTable);
             await m.createTable(streakStatusTable);
+          }
+          if (from < 6) {
+            await m.addColumn(settingsTable, settingsTable.notificationSound);
+            await m.addColumn(settingsTable, settingsTable.vibrationEnabled);
           }
         },
       );

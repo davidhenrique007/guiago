@@ -8,7 +8,11 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/errors/failures.dart';
 import '../../../core/result/result.dart';
+import '../domain/alarm_channel_spec.dart';
 import '../domain/alarm_notifier.dart';
+import '../domain/alarm_preferences.dart';
+import '../domain/alarm_sound_previewer.dart';
+import '../domain/notification_sound.dart';
 
 /// Thin wrapper around `flutter_local_notifications` — the only
 /// place in the app that talks to the native notification/alarm
@@ -18,18 +22,25 @@ import '../domain/alarm_notifier.dart';
 /// Notification-tap handling is deliberately the simple case only —
 /// tap opens the app and navigates to the alarm screen, not a
 /// full-screen intent. See ADR-008.
-class NotificationService implements AlarmNotifier {
-  NotificationService({FlutterLocalNotificationsPlugin? plugin})
-      : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
+///
+/// The sound, the vibration and the on/off switch come from
+/// [AlarmPreferencesSource] and are read each time an alarm is
+/// scheduled; each sound + vibration combination uses its own Android
+/// channel (see [AlarmChannelSpec]).
+class NotificationService implements AlarmNotifier, AlarmSoundPreviewer {
+  NotificationService({
+    FlutterLocalNotificationsPlugin? plugin,
+    AlarmPreferencesSource? preferences,
+  })  : _plugin = plugin ?? FlutterLocalNotificationsPlugin(),
+        _preferences = preferences;
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final AlarmPreferencesSource? _preferences;
   bool _initialized = false;
 
   final StreamController<String> _tapController =
       StreamController<String>.broadcast();
 
-  static const String _channelId = 'guiago_alarms';
-  static const String _channelName = 'GuiaGo — Lembretes';
   static const String _channelDescription =
       'Lembretes de tarefas agendados pelo GuiaGo';
 
@@ -109,6 +120,47 @@ class NotificationService implements AlarmNotifier {
     }
   }
 
+  /// Id of the "test sound" notification; never used by a real alarm.
+  static const int _previewNotificationId = 2147480000;
+
+  NotificationDetails _details(AlarmChannelSpec spec) {
+    final String? raw = spec.rawResource;
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        spec.id,
+        spec.name,
+        channelDescription: _channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: spec.playSound,
+        sound: raw == null ? null : RawResourceAndroidNotificationSound(raw),
+        enableVibration: spec.vibration,
+      ),
+      iOS: DarwinNotificationDetails(presentSound: spec.playSound),
+    );
+  }
+
+  @override
+  Future<Result<void>> preview(
+    NotificationSound sound, {
+    required bool vibration,
+  }) async {
+    try {
+      await _ensureInitialized();
+      await _plugin.show(
+        id: _previewNotificationId,
+        title: 'GuiaGo',
+        body: sound.label,
+        notificationDetails: _details(
+          AlarmChannelSpec.forPreferences(sound: sound, vibration: vibration),
+        ),
+      );
+      return const Success<void>(null);
+    } catch (e) {
+      return Fail<void>(AlarmFailure('Failed to preview sound', cause: e));
+    }
+  }
+
   @override
   Future<Result<void>> scheduleAt({
     required int id,
@@ -119,6 +171,14 @@ class NotificationService implements AlarmNotifier {
   }) async {
     try {
       await _ensureInitialized();
+      final AlarmPreferences preferences =
+          await _preferences?.current() ?? AlarmPreferences.fallback;
+      // Notifications switched off in the Profile: nothing rings. The
+      // occurrence stays in the database; it is re-armed when the user
+      // switches notifications back on.
+      if (!preferences.notificationsEnabled) {
+        return const Success<void>(null);
+      }
       final tz.TZDateTime scheduled = tz.TZDateTime.from(scheduledAt, tz.local);
       await _plugin.zonedSchedule(
         id: id,
@@ -126,15 +186,11 @@ class NotificationService implements AlarmNotifier {
         body: body,
         scheduledDate: scheduled,
         payload: payload,
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.max,
-            priority: Priority.high,
+        notificationDetails: _details(
+          AlarmChannelSpec.forPreferences(
+            sound: preferences.sound,
+            vibration: preferences.vibrationEnabled,
           ),
-          iOS: DarwinNotificationDetails(),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );

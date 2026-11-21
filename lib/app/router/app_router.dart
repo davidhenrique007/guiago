@@ -111,8 +111,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.taskCreate,
         name: AppRoutes.taskCreateName,
-        builder: (BuildContext context, GoRouterState state) =>
-            const TaskCreateScreen(),
+        builder: (BuildContext context, GoRouterState state) {
+          // The Calendar passes the selected day as `extra`.
+          final Object? extra = state.extra;
+          return TaskCreateScreen(
+            initialDate: extra is DateTime ? extra : null,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.taskEdit,

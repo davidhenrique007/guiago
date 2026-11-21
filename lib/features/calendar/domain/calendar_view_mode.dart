@@ -1,8 +1,9 @@
-/// The two ways the Calendar tab can show time. The selected day's
-/// list is below both: it is the "day" view.
+/// The three ways the Calendar tab can show time. "Day" keeps the week
+/// strip of the first version above the selected day's list.
 enum CalendarViewMode {
-  week('Semana'),
-  month('Mês');
+  day('Dia'),
+  month('Mês'),
+  year('Ano');
 
   const CalendarViewMode(this.label);
 

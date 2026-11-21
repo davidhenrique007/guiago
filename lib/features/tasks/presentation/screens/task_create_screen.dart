@@ -30,10 +30,14 @@ import '../widgets/task_create_recurrence_selector.dart';
 /// carrega-a, e ao guardar usa `TaskEngine.editTask`, que reagenda o
 /// alarme.
 class TaskCreateScreen extends ConsumerStatefulWidget {
-  const TaskCreateScreen({this.taskId, super.key});
+  const TaskCreateScreen({this.taskId, this.initialDate, super.key});
 
   /// Null = criar; preenchido = editar essa tarefa.
   final String? taskId;
+
+  /// Ao criar, o dia já escolhido (vem do Calendário). Null = hoje. Datas
+  /// futuras começam às 09:00; hoje começa daqui a uma hora.
+  final DateTime? initialDate;
 
   @override
   ConsumerState<TaskCreateScreen> createState() => _TaskCreateScreenState();
@@ -69,6 +73,15 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
   @override
   void initState() {
     super.initState();
+    final DateTime? initial = widget.initialDate;
+    if (!_isEditing && initial != null) {
+      _date = DateTime(initial.year, initial.month, initial.day);
+      final DateTime today = DateTime.now();
+      final bool isToday = _date.year == today.year &&
+          _date.month == today.month &&
+          _date.day == today.day;
+      if (!isToday) _time = const TimeOfDay(hour: 9, minute: 0);
+    }
     if (_isEditing) {
       _isLoading = true;
       _loadDraft();
@@ -135,12 +148,13 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
 
   Future<void> _pickDate() async {
     final DateTime base = DateTime.now().subtract(const Duration(days: 1));
+    final DateTime limit = DateTime.now().add(const Duration(days: 365 * 5));
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _date,
       // Editing a task that is already overdue must still open.
       firstDate: _date.isBefore(base) ? _date : base,
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: _date.isAfter(limit) ? _date : limit,
     );
     if (picked != null) setState(() => _date = picked);
   }

@@ -2,12 +2,39 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:guiago/core/result/result.dart';
 import 'package:guiago/core/services/app_database.dart';
 import 'package:guiago/core/services/database_provider.dart';
 import 'package:guiago/design_system/components/app_bottom_sheet.dart';
 import 'package:guiago/features/onboarding/data/drift_settings_repository.dart';
 import 'package:guiago/features/onboarding/domain/settings.dart';
 import 'package:guiago/features/profile/presentation/screens/profile_screen.dart';
+import 'package:guiago/features/scheduler/data/scheduler_providers.dart';
+import 'package:guiago/features/scheduler/domain/alarm_notifier.dart';
+
+class _FakeNotifier implements AlarmNotifier {
+  @override
+  Future<Result<void>> scheduleAt({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledAt,
+    required String payload,
+  }) async =>
+      const Success<void>(null);
+
+  @override
+  Future<Result<void>> cancel(int id) async => const Success<void>(null);
+
+  @override
+  Future<Result<void>> cancelAll() async => const Success<void>(null);
+
+  @override
+  Stream<String> get onNotificationTapped => const Stream<String>.empty();
+
+  @override
+  Future<String?> checkLaunchPayload() async => null;
+}
 
 void main() {
   late AppDatabase db;
@@ -24,7 +51,10 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          notificationServiceProvider.overrideWithValue(_FakeNotifier()),
+        ],
         child: const MaterialApp(home: ProfileScreen()),
       ),
     );

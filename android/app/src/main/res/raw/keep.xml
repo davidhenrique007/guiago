@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Os sons são referenciados só pelo nome (texto) no código Dart; sem isto
+     o encolhimento de recursos do build release pode removê-los. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/guiago_soft,@raw/guiago_alert,@raw/guiago_wake" />

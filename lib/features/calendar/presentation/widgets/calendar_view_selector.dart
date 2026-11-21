@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../../domain/calendar_view_mode.dart';
 
-/// Segmented Semana/Mês toggle, in the same look as the Dashboard's
+/// Segmented Dia/Mês/Ano toggle, in the same look as the Dashboard's
 /// period selector.
 class CalendarViewSelector extends StatelessWidget {
   const CalendarViewSelector({
