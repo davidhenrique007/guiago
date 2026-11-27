@@ -24,7 +24,7 @@ class AppCard extends StatelessWidget {
     final Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[AppColors.surface, AppColors.background],

@@ -35,9 +35,11 @@ class AppBottomSheet extends StatelessWidget {
         top: AppSpacing.sm,
         bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.md,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadius.lg),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

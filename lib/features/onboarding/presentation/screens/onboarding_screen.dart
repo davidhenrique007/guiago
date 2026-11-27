@@ -69,8 +69,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       success: (_) => context.go(AppRoutes.home),
       failure: (Failure failure) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
               'Não foi possível guardar as suas preferências. '
               'Tente novamente.',
             ),

@@ -50,6 +50,15 @@ class SettingsTable extends Table {
   BoolColumn get vibrationEnabled =>
       boolean().withDefault(const Constant(true))();
 
+  /// Fase 9: `AppThemeMode.key` (system / light / dark).
+  TextColumn get themeMode => text().withDefault(const Constant('dark'))();
+
+  /// Fase 9: `AppLanguage.code` (pt / en).
+  TextColumn get languageCode => text().withDefault(const Constant('pt'))();
+
+  /// Fase 9: path of the profile photo copy; empty = none.
+  TextColumn get photoPath => text().withDefault(const Constant(''))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -281,7 +290,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -310,6 +319,15 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.addColumn(settingsTable, settingsTable.notificationSound);
             await m.addColumn(settingsTable, settingsTable.vibrationEnabled);
+          }
+          if (from < 7) {
+            await m.addColumn(settingsTable, settingsTable.themeMode);
+          }
+          if (from < 8) {
+            await m.addColumn(settingsTable, settingsTable.languageCode);
+          }
+          if (from < 9) {
+            await m.addColumn(settingsTable, settingsTable.photoPath);
           }
         },
       );

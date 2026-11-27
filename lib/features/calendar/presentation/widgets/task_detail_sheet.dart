@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../tasks/domain/occurrence_status.dart';
 import '../../../tasks/domain/recurrence_rule.dart';
 import '../../../tasks/domain/task_priority.dart';
@@ -24,27 +25,30 @@ abstract final class TaskDetailSheet {
     );
   }
 
-  static String statusLabel(OccurrenceStatus status) => switch (status) {
-        OccurrenceStatus.scheduled => 'Agendada',
-        OccurrenceStatus.triggered => 'Em curso',
-        OccurrenceStatus.snoozed => 'Adiada',
-        OccurrenceStatus.completed => 'Concluída',
-        OccurrenceStatus.declined => 'Recusada',
-        OccurrenceStatus.missed => 'Perdida',
-        OccurrenceStatus.cancelled => 'Cancelada',
+  static String statusLabel(AppLocalizations l10n, OccurrenceStatus status) =>
+      switch (status) {
+        OccurrenceStatus.scheduled => l10n.statusScheduled,
+        OccurrenceStatus.triggered => l10n.statusTriggered,
+        OccurrenceStatus.snoozed => l10n.statusSnoozed,
+        OccurrenceStatus.completed => l10n.statusCompleted,
+        OccurrenceStatus.declined => l10n.statusDeclined,
+        OccurrenceStatus.missed => l10n.statusMissed,
+        OccurrenceStatus.cancelled => l10n.statusCancelled,
       };
 
-  static String priorityLabel(TaskPriority priority) => switch (priority) {
-        TaskPriority.low => 'Baixa',
-        TaskPriority.medium => 'Média',
-        TaskPriority.high => 'Alta',
+  static String priorityLabel(AppLocalizations l10n, TaskPriority priority) =>
+      switch (priority) {
+        TaskPriority.low => l10n.priorityLow,
+        TaskPriority.medium => l10n.priorityMedium,
+        TaskPriority.high => l10n.priorityHigh,
       };
 
-  static String recurrenceLabel(RecurrenceRule rule) => switch (rule) {
-        RecurrenceNone() => 'Nenhuma',
-        RecurrenceDaily() => 'Diária',
-        RecurrenceWeekly() => 'Semanal',
-        RecurrenceCustomDays() => 'Dias específicos',
+  static String recurrenceLabel(AppLocalizations l10n, RecurrenceRule rule) =>
+      switch (rule) {
+        RecurrenceNone() => l10n.recurrenceNone,
+        RecurrenceDaily() => l10n.recurrenceDaily,
+        RecurrenceWeekly() => l10n.recurrenceWeekly,
+        RecurrenceCustomDays() => l10n.recurrenceCustom,
       };
 }
 
@@ -62,9 +66,9 @@ class _DetailBody extends ConsumerWidget {
     // Pattern-matching, not `.when()` — same convention as the screens.
     return switch (detailAsync) {
       AsyncData<CalendarTaskDetail>(:final value) => _Rows(detail: value),
-      AsyncError<CalendarTaskDetail>() => const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-          child: Text('Não foi possível carregar a tarefa.'),
+      AsyncError<CalendarTaskDetail>() => Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Text(context.l10n.detailLoadError),
         ),
       _ => const Padding(
           padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
@@ -81,6 +85,7 @@ class _Rows extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
     final String? description = detail.description;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,28 +96,31 @@ class _Rows extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
         ],
         _Row(
-          label: 'Quando',
-          value: '${PtDateLabels.longDate(detail.scheduledAt)} · '
+          label: l10n.detailWhen,
+          value: '${l10n.longDate(detail.scheduledAt)} · '
               '${PtDateLabels.time(detail.scheduledAt)}',
         ),
         _Row(
-          label: 'Estado',
-          value: TaskDetailSheet.statusLabel(detail.status),
+          label: l10n.detailStatus,
+          value: TaskDetailSheet.statusLabel(l10n, detail.status),
         ),
         _Row(
-          label: 'Prioridade',
-          value: TaskDetailSheet.priorityLabel(detail.priority),
+          label: l10n.detailPriority,
+          value: TaskDetailSheet.priorityLabel(l10n, detail.priority),
         ),
         _Row(
-          label: 'Repetição',
-          value: TaskDetailSheet.recurrenceLabel(detail.recurrenceRule),
+          label: l10n.detailRepeat,
+          value: TaskDetailSheet.recurrenceLabel(l10n, detail.recurrenceRule),
         ),
-        _Row(label: 'Tolerância', value: '${detail.toleranceMinutes} min'),
+        _Row(
+          label: l10n.detailTolerance,
+          value: l10n.minutes(detail.toleranceMinutes),
+        ),
         if (detail.snoozeCount > 0)
-          _Row(label: 'Adiamentos', value: '${detail.snoozeCount}'),
+          _Row(label: l10n.detailSnoozes, value: '${detail.snoozeCount}'),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'Para editar ou apagar, usa a aba Tarefas.',
+          l10n.detailEditHint,
           style: AppTypography.bodyMedium,
         ),
       ],

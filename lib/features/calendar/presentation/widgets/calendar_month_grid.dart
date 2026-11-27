@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../l10n/app_localizations_pt.dart';
 
 /// A Monday-first month grid. Days that have tasks carry a dot; the
 /// selected day is filled. The header has previous/next month buttons.
@@ -24,10 +25,10 @@ class CalendarMonthGrid extends StatelessWidget {
   final VoidCallback onPreviousMonth;
   final VoidCallback onNextMonth;
 
-  /// "Novembro 2026".
-  static String monthLabel(DateTime day) {
-    final String name = PtDateLabels.months[day.month - 1];
-    return '${name[0].toUpperCase()}${name.substring(1)} ${day.year}';
+  /// "Novembro 2026" (Portuguese unless [l10n] says otherwise).
+  static String monthLabel(DateTime day, [AppLocalizations? l10n]) {
+    final AppLocalizations texts = l10n ?? const AppLocalizationsPt();
+    return '${texts.monthName(day.month)} ${day.year}';
   }
 
   /// Number of days in [day]'s month.
@@ -43,6 +44,7 @@ class CalendarMonthGrid extends StatelessWidget {
     final int leading = first.weekday - 1;
     final int cells = ((leading + total + 6) ~/ 7) * 7;
     final DateTime now = DateTime.now();
+    final AppLocalizations l10n = context.l10n;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -51,18 +53,18 @@ class CalendarMonthGrid extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             IconButton(
-              tooltip: 'Mês anterior',
+              tooltip: l10n.previousMonth,
               onPressed: onPreviousMonth,
-              icon: const Icon(
+              icon: Icon(
                 Icons.chevron_left,
                 color: AppColors.textPrimary,
               ),
             ),
-            Text(monthLabel(first), style: AppTypography.titleMedium),
+            Text(monthLabel(first, l10n), style: AppTypography.titleMedium),
             IconButton(
-              tooltip: 'Mês seguinte',
+              tooltip: l10n.nextMonth,
               onPressed: onNextMonth,
-              icon: const Icon(
+              icon: Icon(
                 Icons.chevron_right,
                 color: AppColors.textPrimary,
               ),
@@ -72,11 +74,11 @@ class CalendarMonthGrid extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: <Widget>[
-            for (final String short in PtDateLabels.weekdaysShort)
+            for (int weekday = 1; weekday <= 7; weekday++)
               Expanded(
                 child: Center(
                   child: Text(
-                    short.substring(0, 1).toUpperCase(),
+                    l10n.weekdayShort(weekday).substring(0, 1).toUpperCase(),
                     style: AppTypography.label.copyWith(fontSize: 10),
                   ),
                 ),
@@ -142,15 +144,13 @@ class _MonthDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String tasks = switch (count) {
-      0 => '',
-      1 => ', 1 tarefa',
-      _ => ', $count tarefas',
-    };
+    final AppLocalizations l10n = context.l10n;
+    final String tasks = count == 0 ? '' : ', ${l10n.taskCount(count)}';
     return Semantics(
       button: true,
       selected: isSelected,
-      label: 'Dia ${day.day}$tasks${isSelected ? ', seleccionado' : ''}',
+      label: '${l10n.dayNumber(day.day)}$tasks'
+          '${isSelected ? ', ${l10n.selectedLabel}' : ''}',
       excludeSemantics: true,
       onTap: onTap,
       child: InkWell(

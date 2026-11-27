@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Monday-to-Sunday strip for the week that contains [selectedDay].
 /// Only days of that week can be selected (no week navigation).
@@ -56,8 +56,9 @@ class _WeekDay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String semanticsLabel = '${PtDateLabels.weekdayName(day)} ${day.day}'
-        '${isSelected ? ', seleccionado' : ''}';
+    final AppLocalizations l10n = context.l10n;
+    final String semanticsLabel = '${l10n.weekdayName(day.weekday)} ${day.day}'
+        '${isSelected ? ', ${l10n.selectedLabel}' : ''}';
 
     return Semantics(
       button: true,
@@ -75,7 +76,7 @@ class _WeekDay extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Text(
-                PtDateLabels.weekdaysShort[day.weekday - 1].toUpperCase(),
+                l10n.weekdayShort(day.weekday).toUpperCase(),
                 style: AppTypography.label.copyWith(fontSize: 10),
               ),
               const SizedBox(height: AppSpacing.sm - 1),

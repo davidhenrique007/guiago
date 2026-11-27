@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/calendar_view_mode.dart';
 
 /// Segmented Dia/Mês/Ano toggle, in the same look as the Dashboard's
@@ -14,6 +15,14 @@ class CalendarViewSelector extends StatelessWidget {
 
   final CalendarViewMode selected;
   final ValueChanged<CalendarViewMode> onChanged;
+
+  /// The name of [mode] in the language of [l10n].
+  static String modeLabel(AppLocalizations l10n, CalendarViewMode mode) =>
+      switch (mode) {
+        CalendarViewMode.day => l10n.viewDay,
+        CalendarViewMode.month => l10n.viewMonth,
+        CalendarViewMode.year => l10n.viewYear,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +51,7 @@ class CalendarViewSelector extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  mode.label,
+                  modeLabel(context.l10n, mode),
                   style: AppTypography.label.copyWith(
                     color: isSelected
                         ? AppColors.textPrimary

@@ -50,7 +50,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.check_circle_outline,
                 size: 56,
                 color: AppColors.primary,

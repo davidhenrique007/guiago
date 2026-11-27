@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/app_palette.dart';
 import '../../../../design_system/design_system.dart';
 import '../../domain/dashboard_snapshot.dart';
 
@@ -119,10 +120,15 @@ class _LegendRow extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.value});
+  _RingPainter({required this.value})
+      : brightness = AppPalette.current.brightness;
 
   /// 0.0–1.0
   final double value;
+
+  /// The palette this was built for: colors are read while painting, so
+  /// a theme change must repaint even when [value] is the same.
+  final Brightness brightness;
 
   static const double _stroke = 8;
 
@@ -154,5 +160,5 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RingPainter oldDelegate) =>
-      oldDelegate.value != value;
+      oldDelegate.value != value || oldDelegate.brightness != brightness;
 }

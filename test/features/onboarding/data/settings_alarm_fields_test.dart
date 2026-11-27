@@ -39,6 +39,51 @@ void main() {
       expect(settings.vibrationEnabled, isTrue);
     });
 
+    test('the theme mode defaults to dark and survives a reload', () async {
+      expect(
+        (await repository.getSettings()).valueOrNull!.themeMode,
+        'dark',
+      );
+
+      await repository.saveSettings(
+        Settings.initial.copyWith(themeMode: 'system'),
+      );
+
+      expect(
+        (await repository.getSettings()).valueOrNull!.themeMode,
+        'system',
+      );
+    });
+
+    test('the language defaults to Portuguese and survives a reload', () async {
+      expect(
+        (await repository.getSettings()).valueOrNull!.languageCode,
+        'pt',
+      );
+
+      await repository.saveSettings(
+        Settings.initial.copyWith(languageCode: 'en'),
+      );
+
+      expect(
+        (await repository.getSettings()).valueOrNull!.languageCode,
+        'en',
+      );
+    });
+
+    test('the photo path defaults to empty and survives a reload', () async {
+      expect((await repository.getSettings()).valueOrNull!.photoPath, '');
+
+      await repository.saveSettings(
+        Settings.initial.copyWith(photoPath: '/app/profile_1.jpg'),
+      );
+
+      expect(
+        (await repository.getSettings()).valueOrNull!.photoPath,
+        '/app/profile_1.jpg',
+      );
+    });
+
     test('a chosen sound and vibration survive a save and a reload', () async {
       await repository.saveSettings(
         Settings.initial.copyWith(
@@ -127,5 +172,8 @@ void main() {
     expect(settings.defaultSnoozeMinutes, 5);
     expect(settings.notificationSound, 'system');
     expect(settings.vibrationEnabled, isTrue);
+    expect(settings.themeMode, 'dark');
+    expect(settings.languageCode, 'pt');
+    expect(settings.photoPath, '');
   });
 }

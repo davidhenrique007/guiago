@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../scheduler/domain/notification_sound.dart';
 
 /// Bottom sheet to choose the alarm sound. Every sound (except
@@ -8,6 +9,16 @@ import '../../../scheduler/domain/notification_sound.dart';
 /// chooses it and closes the sheet. Returns the chosen sound, or null
 /// when dismissed.
 abstract final class ProfileSoundPicker {
+  /// The name of [sound] in the language of [l10n].
+  static String soundLabel(AppLocalizations l10n, NotificationSound sound) =>
+      switch (sound) {
+        NotificationSound.soft => l10n.soundSoft,
+        NotificationSound.alert => l10n.soundAlert,
+        NotificationSound.wake => l10n.soundWake,
+        NotificationSound.system => l10n.soundSystem,
+        NotificationSound.none => l10n.soundNone,
+      };
+
   static Future<NotificationSound?> show(
     BuildContext context, {
     required NotificationSound selected,
@@ -15,7 +26,7 @@ abstract final class ProfileSoundPicker {
   }) {
     return AppBottomSheet.show<NotificationSound>(
       context,
-      title: 'Som da notificação',
+      title: context.l10n.rowSound,
       child: Builder(
         builder: (BuildContext sheetContext) => Material(
           color: Colors.transparent,
@@ -53,6 +64,8 @@ class _SoundRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
+    final String name = ProfileSoundPicker.soundLabel(l10n, sound);
     return InkWell(
       onTap: onChoose,
       child: ConstrainedBox(
@@ -64,12 +77,12 @@ class _SoundRow extends StatelessWidget {
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             const SizedBox(width: AppSpacing.md),
-            Expanded(child: Text(sound.label, style: AppTypography.bodyLarge)),
+            Expanded(child: Text(name, style: AppTypography.bodyLarge)),
             if (sound.playsSound)
               IconButton(
-                tooltip: 'Ouvir ${sound.label}',
+                tooltip: l10n.soundPreview(name),
                 onPressed: onPreview,
-                icon: const Icon(
+                icon: Icon(
                   Icons.play_circle_outline,
                   color: AppColors.primary,
                 ),

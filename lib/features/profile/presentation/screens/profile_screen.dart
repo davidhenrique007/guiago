@@ -5,19 +5,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../../app/theme/app_theme_mode.dart';
 import '../../../../core/result/result.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_language.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../home/application/home_controller.dart';
 import '../../../onboarding/application/settings_controller.dart';
 import '../../../onboarding/domain/settings.dart';
 import '../../../scheduler/data/alarm_preferences_providers.dart';
 import '../../../scheduler/domain/notification_sound.dart';
 import '../../../tasks/presentation/widgets/task_create_options.dart';
+import '../../application/profile_photo_providers.dart';
+import '../../domain/profile_photo_store.dart';
 import '../widgets/profile_edit_sheet.dart';
 import '../widgets/profile_header.dart';
+import '../widgets/profile_language_picker.dart';
 import '../widgets/profile_minutes_picker.dart';
+import '../widgets/profile_photo_sheet.dart';
 import '../widgets/profile_preferences_card.dart';
 import '../widgets/profile_sound_picker.dart';
+import '../widgets/profile_theme_picker.dart';
 
 /// The Perfil tab: who the user is (editable), the link to Insights
 /// and the preferences (editable). Changes go through
@@ -40,7 +48,7 @@ class ProfileScreen extends ConsumerWidget {
     if (!context.mounted) return;
     if (result.isFailure) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível guardar.')),
+        SnackBar(content: Text(context.l10n.commonSaveFailed)),
       );
       return;
     }
@@ -56,6 +64,77 @@ class ProfileScreen extends ConsumerWidget {
             .apply(notificationsEnabled: enabled),
       );
     }
+  }
+
+  Future<void> _pickTheme(
+    BuildContext context,
+    WidgetRef ref,
+    Settings settings,
+  ) async {
+    final AppThemeMode? mode = await ProfileThemePicker.show(
+      context,
+      selected: AppThemeMode.fromKey(settings.themeMode),
+    );
+    if (mode == null || !context.mounted) return;
+    await _save(
+      context,
+      ref,
+      (Settings s) => s.copyWith(themeMode: mode.key),
+    );
+  }
+
+  Future<void> _changePhoto(
+    BuildContext context,
+    WidgetRef ref,
+    Settings settings,
+  ) async {
+    final ProfilePhotoAction? action = await ProfilePhotoSheet.show(
+      context,
+      hasPhoto: settings.photoPath.isNotEmpty,
+    );
+    if (action == null || !context.mounted) return;
+    final ProfilePhotoStore store = ref.read(profilePhotoStoreProvider);
+    final String previous = settings.photoPath;
+
+    if (action == ProfilePhotoAction.remove) {
+      await _save(context, ref, (Settings s) => s.copyWith(photoPath: ''));
+      if (previous.isNotEmpty) await store.delete(previous);
+      return;
+    }
+
+    final Result<String?> picked = await store.pick(
+      action == ProfilePhotoAction.camera
+          ? ProfilePhotoSource.camera
+          : ProfilePhotoSource.gallery,
+    );
+    if (!context.mounted) return;
+    if (picked.isFailure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.photoFailed)),
+      );
+      return;
+    }
+    final String? path = picked.valueOrNull;
+    if (path == null) return; // cancelled
+    await _save(context, ref, (Settings s) => s.copyWith(photoPath: path));
+    if (previous.isNotEmpty && previous != path) await store.delete(previous);
+  }
+
+  Future<void> _pickLanguage(
+    BuildContext context,
+    WidgetRef ref,
+    Settings settings,
+  ) async {
+    final AppLanguage? language = await ProfileLanguagePicker.show(
+      context,
+      selected: AppLanguage.fromCode(settings.languageCode),
+    );
+    if (language == null || !context.mounted) return;
+    await _save(
+      context,
+      ref,
+      (Settings s) => s.copyWith(languageCode: language.code),
+    );
   }
 
   Future<void> _pickSound(
@@ -139,9 +218,7 @@ class ProfileScreen extends ConsumerWidget {
     final int end = isStart ? settings.dayEndMinutes : minutes;
     if (end <= start) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('O fim do dia tem de ser depois do início.'),
-        ),
+        SnackBar(content: Text(context.l10n.dayEndBeforeStart)),
       );
       return;
     }
@@ -165,7 +242,7 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: Text('Perfil', style: AppTypography.titleLarge),
+        title: Text(context.l10n.profileTitle, style: AppTypography.titleLarge),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -185,6 +262,7 @@ class ProfileScreen extends ConsumerWidget {
                       ProfileHeader(
                         settings: value,
                         onEdit: () => _editProfile(context, ref, value),
+                        onPhotoTap: () => _changePhoto(context, ref, value),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       AppCard(
@@ -192,7 +270,7 @@ class ProfileScreen extends ConsumerWidget {
                             context.pushNamed(AppRoutes.profileInsightsName),
                         child: Row(
                           children: <Widget>[
-                            const Icon(
+                            Icon(
                               Icons.insights_outlined,
                               color: AppColors.primary,
                             ),
@@ -202,19 +280,18 @@ class ProfileScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: <Widget>[
                                   Text(
-                                    'Insights',
+                                    context.l10n.profileInsightsTitle,
                                     style: AppTypography.titleMedium,
                                   ),
                                   const SizedBox(height: AppSpacing.xs),
                                   Text(
-                                    'O teu melhor horário e as tarefas '
-                                    'que mais concluis.',
+                                    context.l10n.profileInsightsSubtitle,
                                     style: AppTypography.bodyMedium,
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(
+                            Icon(
                               Icons.chevron_right,
                               color: AppColors.textSecondary,
                             ),
@@ -238,6 +315,8 @@ class ProfileScreen extends ConsumerWidget {
                           (Settings s) => s.copyWith(vibrationEnabled: enabled),
                           affectsAlarms: true,
                         ),
+                        onThemeTap: () => _pickTheme(context, ref, value),
+                        onLanguageTap: () => _pickLanguage(context, ref, value),
                         onTtsChanged: (bool enabled) => _save(
                           context,
                           ref,
@@ -246,7 +325,7 @@ class ProfileScreen extends ConsumerWidget {
                         onSnoozeTap: () => _pickMinutes(
                           context,
                           ref,
-                          title: 'Snooze padrão',
+                          title: context.l10n.rowSnooze,
                           options: TaskCreateOptions.snoozeMinutes,
                           selected: value.defaultSnoozeMinutes,
                           apply: (Settings s, int minutes) =>
@@ -255,7 +334,7 @@ class ProfileScreen extends ConsumerWidget {
                         onToleranceTap: () => _pickMinutes(
                           context,
                           ref,
-                          title: 'Tolerância padrão',
+                          title: context.l10n.rowTolerance,
                           options: TaskCreateOptions.toleranceMinutes,
                           selected: value.defaultToleranceMinutes,
                           apply: (Settings s, int minutes) =>
@@ -272,7 +351,7 @@ class ProfileScreen extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
                     child: AppErrorState(
-                      message: 'Não foi possível carregar o perfil.',
+                      message: context.l10n.profileLoadError,
                       onRetry: () => ref
                           .read(settingsControllerProvider.notifier)
                           .refresh(),

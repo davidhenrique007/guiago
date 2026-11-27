@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Saudação + data (master spec §22).
 class HomeGreeting extends StatelessWidget {
@@ -10,24 +10,23 @@ class HomeGreeting extends StatelessWidget {
   final String userName;
   final DateTime today;
 
-  String get _period {
+  String _period(AppLocalizations l10n) {
     final int hour = DateTime.now().hour;
-    if (hour < 12) return 'Bom dia';
-    if (hour < 19) return 'Boa tarde';
-    return 'Boa noite';
+    if (hour < 12) return l10n.greetingMorning;
+    if (hour < 19) return l10n.greetingAfternoon;
+    return l10n.greetingEvening;
   }
-
-  String get _dateLabel => PtDateLabels.longDate(today);
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
     final String suffix = userName.trim().isEmpty ? '' : ', $userName';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('$_period$suffix', style: AppTypography.displayLarge),
+        Text('${_period(l10n)}$suffix', style: AppTypography.displayLarge),
         const SizedBox(height: AppSpacing.xs),
-        Text(_dateLabel, style: AppTypography.bodyMedium),
+        Text(l10n.longDate(today), style: AppTypography.bodyMedium),
       ],
     );
   }

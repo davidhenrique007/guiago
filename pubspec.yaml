@@ -13,6 +13,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Fase 9 — Material/Cupertino texts (date pickers, etc.) in pt and en
+  flutter_localizations:
+    sdk: flutter
+
   # State management
   flutter_riverpod: ^3.4.2
   riverpod_annotation: ^4.0.6
@@ -29,6 +33,9 @@ dependencies:
   sqlite3_flutter_libs: ^0.6.0
   path_provider: ^2.1.3
   path: ^1.9.0
+
+  # Fase 9 — profile photo (system gallery picker / camera app)
+  image_picker: ^1.1.2
 
   # Identifiers
   uuid: ^4.4.0

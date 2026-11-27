@@ -51,12 +51,11 @@ class AppTextField extends StatelessWidget {
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.field),
-              borderSide: const BorderSide(color: AppColors.borderSoft),
+              borderSide: BorderSide(color: AppColors.borderSoft),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.field),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         ),

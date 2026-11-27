@@ -187,3 +187,31 @@ Everything under `lib/features/*` is intentionally empty. See
 - `AlarmPreferencesApplier`: mudar som/vibração/interruptor rearma (ou cancela)
   os alarmes já agendados, reutilizando o `RecoveryService`.
 - Base de dados v6: `settings.notification_sound`, `settings.vibration_enabled`.
+
+## Fase 9 — Lote J (tema)
+
+- `app/theme`: `AppPalette` (dark/light), `AppColors` (getters da paleta ativa),
+  `AppTheme.light()/dark()`, `AppThemeMode`, `PaletteScope`, `themeModeProvider`.
+- `AppColors` não é `const`; ver ADR-014.
+- Base de dados v7: `settings.theme_mode`.
+
+## Fase 9 — Lote K (idioma)
+
+- `lib/l10n`: `AppLocalizations` (abstrata) + `AppLocalizationsPt/En` escritas
+  à mão, `AppLanguage`, `languageProvider`; `context.l10n` (fallback PT).
+- `MaterialApp.locale` segue `languageProvider`; delegates Material/Cupertino
+  via `flutter_localizations`.
+- Base de dados v8: `settings.language_code`. Ver ADR-015.
+
+## Fase 9 — Lote P (foto de perfil)
+
+- `features/profile`: `domain/ProfilePhotoStore`, `infrastructure/ImagePickerProfilePhotoStore`,
+  `application/profilePhotoStoreProvider`; widgets `ProfileAvatar`, `ProfilePhotoSheet`.
+- Base de dados v9: `settings.photo_path` (caminho da cópia dentro da app).
+
+## Fase 9 — fecho
+
+Esquema da base de dados: v9. Colunas novas em `settings` desde a Fase 8:
+`notification_sound`, `vibration_enabled` (v6), `theme_mode` (v7),
+`language_code` (v8), `photo_path` (v9). Alterar `Settings` ou uma tabela exige
+`dart run build_runner build -d`. Relatório completo: `docs/FASE9_RELATORIO.md`.

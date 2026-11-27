@@ -19,7 +19,7 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: <Widget>[
               const Spacer(flex: 2),
-              const Icon(
+              Icon(
                 Icons.check_circle_outline,
                 size: 72,
                 color: AppColors.primary,

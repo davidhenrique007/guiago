@@ -27,7 +27,7 @@ class HomeNextTaskCard extends StatelessWidget {
       return AppCard(
         child: Row(
           children: <Widget>[
-            const Icon(Icons.check_circle_outline, color: AppColors.success),
+            Icon(Icons.check_circle_outline, color: AppColors.success),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(

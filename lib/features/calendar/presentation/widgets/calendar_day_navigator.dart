@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// "‹  Sábado, 21 de novembro  ›": moves the selected day one day back
 /// or forward, so any day (past or future) is one tap away.
@@ -19,24 +19,25 @@ class CalendarDayNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
     return Row(
       children: <Widget>[
         IconButton(
-          tooltip: 'Dia anterior',
+          tooltip: l10n.previousDay,
           onPressed: onPrevious,
-          icon: const Icon(Icons.chevron_left, color: AppColors.textPrimary),
+          icon: Icon(Icons.chevron_left, color: AppColors.textPrimary),
         ),
         Expanded(
           child: Text(
-            PtDateLabels.longDate(day),
+            l10n.longDate(day),
             textAlign: TextAlign.center,
             style: AppTypography.bodyMedium,
           ),
         ),
         IconButton(
-          tooltip: 'Dia seguinte',
+          tooltip: l10n.nextDay,
           onPressed: onNext,
-          icon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
+          icon: Icon(Icons.chevron_right, color: AppColors.textPrimary),
         ),
       ],
     );

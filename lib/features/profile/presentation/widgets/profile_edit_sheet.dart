@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// What the user typed in [ProfileEditSheet].
 typedef ProfileEdit = ({String name, String objective});
@@ -15,7 +16,7 @@ abstract final class ProfileEditSheet {
   }) {
     return AppBottomSheet.show<ProfileEdit>(
       context,
-      title: 'Editar perfil',
+      title: context.l10n.profileEditTitle,
       child: _EditForm(name: name, objective: objective),
     );
   }
@@ -50,7 +51,7 @@ class _EditFormState extends State<_EditForm> {
   void _submit() {
     final String name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _nameError = 'Escreve o teu nome.');
+      setState(() => _nameError = context.l10n.nameRequired);
       return;
     }
     Navigator.of(context).pop((name: name, objective: _objective.text.trim()));
@@ -63,7 +64,7 @@ class _EditFormState extends State<_EditForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         AppTextField(
-          label: 'Nome',
+          label: context.l10n.fieldName,
           controller: _name,
           errorText: _nameError,
           autofocus: true,
@@ -72,9 +73,12 @@ class _EditFormState extends State<_EditForm> {
           },
         ),
         const SizedBox(height: AppSpacing.md),
-        AppTextField(label: 'Objetivo principal', controller: _objective),
+        AppTextField(
+          label: context.l10n.fieldObjective,
+          controller: _objective,
+        ),
         const SizedBox(height: AppSpacing.lg),
-        AppButton(label: 'Guardar', onPressed: _submit),
+        AppButton(label: context.l10n.commonSave, onPressed: _submit),
       ],
     );
   }

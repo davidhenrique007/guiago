@@ -71,7 +71,7 @@ class _AlarmPermissionBannerState extends ConsumerState<AlarmPermissionBanner>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const Icon(
+            Icon(
               Icons.notifications_off_outlined,
               color: AppColors.warning,
             ),

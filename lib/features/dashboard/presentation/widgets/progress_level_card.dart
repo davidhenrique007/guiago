@@ -28,7 +28,7 @@ class ProgressLevelCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Row(
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.workspace_premium_outlined,
                 size: 24,
                 color: AppColors.accent,

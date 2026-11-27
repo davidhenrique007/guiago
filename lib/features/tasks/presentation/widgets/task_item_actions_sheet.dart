@@ -24,7 +24,7 @@ abstract final class TaskItemActionsSheet {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.edit_outlined,
                   color: AppColors.textPrimary,
                 ),
@@ -33,7 +33,7 @@ abstract final class TaskItemActionsSheet {
                     Navigator.of(sheetContext).pop(TaskItemAction.edit),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_outline,
                   color: AppColors.error,
                 ),

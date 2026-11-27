@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,8 +14,14 @@ import '../features/recovery/data/recovery_providers.dart';
 import '../features/recovery/domain/recovery_report.dart';
 import '../features/scheduler/data/scheduler_providers.dart';
 import '../features/scheduler/domain/alarm_notifier.dart';
+import '../l10n/app_language.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/language_provider.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
+import 'theme/app_theme_mode.dart';
+import 'theme/palette_scope.dart';
+import 'theme/theme_mode_provider.dart';
 
 /// GuiaGo root widget. Wires theme + router on top of the Riverpod
 /// [ProviderScope] created in `main.dart`, listens for notification
@@ -98,11 +105,26 @@ class _GuiaGoAppState extends ConsumerState<GuiaGoApp>
   @override
   Widget build(BuildContext context) {
     final GoRouter router = ref.watch(appRouterProvider);
+    final AppThemeMode themeMode = ref.watch(themeModeProvider);
+    final AppLanguage language = ref.watch(languageProvider);
 
     return MaterialApp.router(
       title: 'GuiaGo',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode.themeMode,
+      // The palette switches at once; a theme cross-fade would mix both.
+      themeAnimationDuration: Duration.zero,
+      locale: language.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      builder: themedAppBuilder,
       routerConfig: router,
     );
   }

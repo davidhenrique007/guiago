@@ -1,40 +1,42 @@
 import 'package:flutter/material.dart';
 
-/// GuiaGo color foundation — dark-first palette taken from the
-/// approved screen designs (emerald on near-black, amber and coral as
-/// signal colors). Master spec §7: calm, focused, premium.
+import 'app_palette.dart';
+
+/// GuiaGo color roles. Widgets reference roles (`primary`, `surface`,
+/// `textSecondary`...), never raw hex values; each role resolves to the
+/// active [AppPalette] (dark or light), so the whole app re-themes from
+/// `app_palette.dart`.
 ///
-/// Token names are stable: widgets reference roles (`primary`,
-/// `surface`, `textSecondary`...), never raw hex values, so the whole
-/// app can be re-themed from this one file.
+/// These are getters, not constants: they cannot be used in `const`
+/// expressions. Build the widget without `const` instead.
 abstract final class AppColors {
   // Brand
-  static const Color primary = Color(0xFF2FBF83); // emerald
-  static const Color primaryVariant = Color(0xFF1F8F60); // emerald-deep
-  static const Color accent = Color(0xFFE8A94C); // amber
+  static Color get primary => AppPalette.current.primary;
+  static Color get primaryVariant => AppPalette.current.primaryVariant;
+  static Color get accent => AppPalette.current.accent;
 
-  // Surfaces (darkest to lightest)
-  static const Color backgroundVoid = Color(0xFF070B09);
-  static const Color background = Color(0xFF0A100D);
-  static const Color surface = Color(0xFF121A16);
-  static const Color surfaceMuted = Color(0xFF1A241E);
+  // Surfaces (darkest to lightest in the dark palette)
+  static Color get backgroundVoid => AppPalette.current.backgroundVoid;
+  static Color get background => AppPalette.current.background;
+  static Color get surface => AppPalette.current.surface;
+  static Color get surfaceMuted => AppPalette.current.surfaceMuted;
 
   // Text
-  static const Color textPrimary = Color(0xFFF2F5F3);
-  static const Color textSecondary = Color(0xFF8EA296);
+  static Color get textPrimary => AppPalette.current.textPrimary;
+  static Color get textSecondary => AppPalette.current.textSecondary;
 
   /// Decorative only (disabled hints, captions on cards). It does not
   /// reach WCAG AA contrast on [surface] — never use it for text the
   /// user must read.
-  static const Color textTertiary = Color(0xFF5C6B63);
-  static const Color textOnPrimary = Color(0xFF06120C);
+  static Color get textTertiary => AppPalette.current.textTertiary;
+  static Color get textOnPrimary => AppPalette.current.textOnPrimary;
 
   // State
-  static const Color success = Color(0xFF2FBF83);
-  static const Color warning = Color(0xFFE8A94C);
-  static const Color error = Color(0xFFE2685F); // coral
+  static Color get success => AppPalette.current.success;
+  static Color get warning => AppPalette.current.warning;
+  static Color get error => AppPalette.current.error;
 
   // Borders / dividers
-  static const Color border = Color(0xFF22302A);
-  static const Color borderSoft = Color(0xFF182019);
+  static Color get border => AppPalette.current.border;
+  static Color get borderSoft => AppPalette.current.borderSoft;
 }

@@ -1,26 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../onboarding/domain/day_window.dart';
 import '../../../tasks/domain/occurrence_status.dart';
 import '../../../tasks/domain/task_priority.dart';
 import '../../domain/calendar_task_item.dart';
+import 'task_detail_sheet.dart';
 
 /// The occurrences of the selected day, in the same visual style as
 /// the Home's "Hoje" list.
 class CalendarDayList extends StatelessWidget {
-  const CalendarDayList({required this.items, this.onTap, super.key});
+  const CalendarDayList({
+    required this.items,
+    this.onTap,
+    this.dayWindow,
+    super.key,
+  });
 
   final List<CalendarTaskItem> items;
 
   /// Called when a card is tapped; when null the cards are not tappable.
   final ValueChanged<CalendarTaskItem>? onTap;
 
+  /// The user's day (Perfil). A task outside it is labelled "fora do
+  /// teu dia"; null = no marking.
+  final DayWindow? dayWindow;
+
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const AppEmptyState(
-        title: 'Sem tarefas neste dia',
-        message: 'As tarefas agendadas para este dia aparecem aqui.',
+      return AppEmptyState(
+        title: context.l10n.noTasksTitle,
+        message: context.l10n.noTasksMessage,
         icon: Icons.event_available_outlined,
       );
     }
@@ -32,7 +44,7 @@ class CalendarDayList extends StatelessWidget {
           AppTaskCard(
             time: _timeLabel(item.scheduledAt),
             title: item.title,
-            statusLabel: _statusLabel(item.status),
+            statusLabel: _statusLabel(context.l10n, item),
             tone: _tone(item),
             onTap: onTap == null ? null : () => onTap!(item),
           ),
@@ -57,13 +69,12 @@ class CalendarDayList extends StatelessWidget {
     return '$h:$m';
   }
 
-  static String _statusLabel(OccurrenceStatus status) => switch (status) {
-        OccurrenceStatus.scheduled => 'Agendada',
-        OccurrenceStatus.triggered => 'Em curso',
-        OccurrenceStatus.snoozed => 'Adiada',
-        OccurrenceStatus.completed => 'Concluída',
-        OccurrenceStatus.declined => 'Recusada',
-        OccurrenceStatus.missed => 'Perdida',
-        OccurrenceStatus.cancelled => 'Cancelada',
-      };
+  String _statusLabel(AppLocalizations l10n, CalendarTaskItem item) {
+    final String status = TaskDetailSheet.statusLabel(l10n, item.status);
+    final DayWindow? window = dayWindow;
+    if (window != null && !window.containsTime(item.scheduledAt)) {
+      return '$status · ${l10n.outsideYourDay}';
+    }
+    return status;
+  }
 }

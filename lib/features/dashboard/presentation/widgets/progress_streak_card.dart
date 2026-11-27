@@ -23,7 +23,7 @@ class ProgressStreakCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Row(
             children: <Widget>[
-              const Icon(
+              Icon(
                 Icons.local_fire_department_rounded,
                 size: 34,
                 color: AppColors.accent,

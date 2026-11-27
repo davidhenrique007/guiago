@@ -95,7 +95,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         backgroundColor: AppColors.primary,
         tooltip: 'Nova tarefa',
         onPressed: _createTask,
-        child: const Icon(Icons.add, color: AppColors.textOnPrimary),
+        child: Icon(Icons.add, color: AppColors.textOnPrimary),
       ),
       body: SafeArea(
         child: RefreshIndicator(

@@ -72,12 +72,71 @@ Telemóvel: ____________  Android: ____  Build: `flutter run --release`
 - [ ] Modo "Não incomodar" / volume de notificações a zero: anotar o
       comportamento (é do Android, não da app).
 
+## 8. Tema Claro / Escuro / Sistema (Fase 9, Lote J)
+- [ ] Perfil → APARÊNCIA → Tema: Claro, Escuro e Sistema.
+- [ ] Claro: a app **inteira** muda na hora (sem reiniciar) e a escolha fica
+      depois de fechar e abrir a app.
+- [ ] Sistema: mudar o tema do telemóvel (Definições → Ecrã) com a app aberta; a
+      app acompanha.
+- [ ] Percorrer no tema **Claro**: Início, Tarefas, Calendário (Dia/Mês/Ano),
+      Progresso (anel e gráfico), Perfil, formulário de tarefa, folhas
+      (editar/apagar/som/tema), ecrã do alarme, onboarding.
+      Procurar: texto ilegível, ícone invisível, fundo escuro esquecido.
+- [ ] Barra de estado (relógio/bateria) legível nos dois temas.
+- [ ] Notificação e som não mudam com o tema.
+
+## 9. Idioma Português / Inglês (Fase 9, Lote K)
+- [ ] Perfil → IDIOMA → Idioma: escolher English; Perfil, barra de baixo,
+      Calendário (Dia/Mês/Ano, detalhe de uma tarefa) e a saudação do Início
+      passam a inglês **na hora**.
+- [ ] Fechar e abrir a app: o idioma fica.
+- [ ] Voltar a Português: tudo volta.
+- [ ] O seletor de horas (Início/Fim do dia) aparece no idioma escolhido.
+- [ ] Esperado em português mesmo em English (ainda por migrar): Tarefas e
+      formulário, alarme, Progresso, Insights, onboarding, notificações.
+
+## 10. Foto de perfil (Fase 9, Lote P)
+- [ ] Perfil → tocar no círculo: Tirar foto / Escolher da galeria.
+- [ ] Escolher da galeria: a foto aparece no círculo; fechar e abrir a app e
+      continua lá.
+- [ ] Tirar foto com a câmara: aparece no círculo.
+- [ ] Cancelar o seletor não altera nada.
+- [ ] Voltar a tocar: aparece "Remover foto"; remover volta à inicial.
+- [ ] Tema claro e escuro: o círculo e a borda ficam bem.
+
+## 11. Android real — fecho da Fase 9 (só num telemóvel físico)
+Os testes automáticos não conseguem verificar som, vibração nem o sistema.
+Em cada linha, anotar Passou / Falhou / Modelo e versão do Android.
+- [ ] **App fechada** (deslizada das recentes): tarefa daqui a 2 min → a
+      notificação toca à hora certa, com o som escolhido.
+- [ ] **Ecrã bloqueado**: o mesmo; a notificação aparece e toca. (O alarme não
+      abre sozinho por cima do ecrã bloqueado: é por desenho, ADR-008.)
+- [ ] **Reinício** do telemóvel com uma tarefa futura: depois de reiniciar,
+      abrir a app **uma vez** e confirmar que ainda toca à hora.
+- [ ] **Som personalizado**: mudar para cada um dos 3 sons GuiaGo, "Som do
+      sistema" e "Sem som"; criar tarefa para daqui a 1–2 min e ouvir cada um.
+- [ ] **Vibração** desligada: toca sem vibrar. Ligada: vibra.
+- [ ] **Snooze**: no alarme tocar "Adiar"; volta a tocar após o tempo escolhido.
+- [ ] **Não incomodar / modo silencioso**: anotar o comportamento (é do
+      sistema; a app não o contorna).
+- [ ] **Poupança de bateria / otimização**: com poupança ativa, o alarme ainda
+      toca à hora? Anotar (alguns fabricantes — Xiaomi, Huawei, Tecno,
+      Infinix — travam apps em segundo plano; pode ser preciso "Sem
+      restrições" nas definições da app).
+- [ ] **Permissões**: com "Alarmes e lembretes" desligado nas definições do
+      sistema, a app avisa; ligar e voltar → o aviso desaparece.
+- [ ] Mudar de idioma e de tema com alarmes agendados: continuam a tocar.
+
 ## Limitações conhecidas (MVP)
-- A janela do dia (Início/Fim) fica guardada mas **ainda não** altera o
-  agendamento. A Voz (TTS), o som, a vibração e o interruptor de Notificações já são respeitados.
+- A janela do dia (Início/Fim) só orienta: avisa no formulário e marca no Calendário; não altera
+  o agendamento nem os alarmes. A Voz (TTS), o som, a vibração e o interruptor de Notificações já são respeitados.
 - O som e a vibração pertencem ao *canal* Android e não mudam depois de o canal
   existir: por isso há um canal por combinação. Canais antigos ficam listados
   nas definições do sistema.
 - Os 3 sons GuiaGo são tons simples gerados (substituíveis: ver `NotificationSound`).
 - O alarme é uma notificação (ADR-008): não abre sozinho sobre o ecrã bloqueado.
-- Vista de Ano no Calendário e rotinas ligadas a objetivos ficam pós-MVP.
+- Rotinas ligadas a objetivos ficam pós-MVP.
+- Idioma: Tarefas e formulário, alarme, Progresso, Insights, onboarding,
+  notificações e voz (TTS) ainda estão só em português.
+- A foto de perfil fica só no telemóvel (cópia na pasta da app); não há cópia
+  de segurança nem sincronização.

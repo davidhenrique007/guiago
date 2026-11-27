@@ -24,6 +24,15 @@ sealed class Settings with _$Settings {
     /// depend on the scheduler feature). Unknown keys mean "system".
     @Default('system') String notificationSound,
     @Default(true) bool vibrationEnabled,
+
+    /// Key of an `AppThemeMode` (system / light / dark). Unknown = dark.
+    @Default('dark') String themeMode,
+
+    /// Code of an `AppLanguage` (pt / en). Unknown = Portuguese.
+    @Default('pt') String languageCode,
+
+    /// Path of the profile photo copy inside the app; empty = no photo.
+    @Default('') String photoPath,
   }) = _Settings;
 
   const Settings._();

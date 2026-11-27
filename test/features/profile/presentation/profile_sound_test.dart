@@ -202,4 +202,55 @@ void main() {
     expect((await saved()).notificationsEnabled, isTrue);
     expect(rearmed, 1);
   });
+
+  group('Aparência', () {
+    testWidgets('shows the theme row, dark by default', (
+      WidgetTester tester,
+    ) async {
+      await pumpProfile(tester);
+
+      expect(find.text('APARÊNCIA'), findsOneWidget);
+      expect(find.text('Tema'), findsOneWidget);
+      expect(find.text('Escuro'), findsOneWidget);
+    });
+
+    testWidgets('lists Claro, Escuro and Sistema', (
+      WidgetTester tester,
+    ) async {
+      await pumpProfile(tester);
+
+      await tester.tap(find.text('Tema'));
+      await tester.pumpAndSettle();
+
+      for (final String label in <String>['Claro', 'Escuro', 'Sistema']) {
+        expect(
+          find.descendant(
+            of: find.byType(AppBottomSheet),
+            matching: find.text(label),
+          ),
+          findsOneWidget,
+        );
+      }
+    });
+
+    testWidgets('choosing Claro saves it and updates the row', (
+      WidgetTester tester,
+    ) async {
+      await pumpProfile(tester);
+
+      await tester.tap(find.text('Tema'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppBottomSheet),
+          matching: find.text('Claro'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect((await saved()).themeMode, 'light');
+      expect(find.text('Claro'), findsOneWidget);
+      expect(rearmed, 0);
+    });
+  });
 }

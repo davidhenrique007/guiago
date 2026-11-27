@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/theme/app_palette.dart';
 
 /// Bar chart of one value per day, drawn with [CustomPainter] — no
 /// charting dependency. The master spec (§4) doesn't list one, and
@@ -17,9 +18,9 @@ class AppTrendChart extends StatelessWidget {
     required this.values,
     this.height = 120,
     this.highlightedIndices = const <int>{},
-    this.dimColor = AppColors.border,
+    Color? dimColor,
     super.key,
-  });
+  }) : _dimColor = dimColor;
 
   /// One value per bar, oldest first, each normally 0.0–1.0.
   /// A negative value means "no data that day" and draws as a
@@ -31,7 +32,11 @@ class AppTrendChart extends StatelessWidget {
   /// [dimColor]. Empty (the default) draws all bars in the primary
   /// color, as before.
   final Set<int> highlightedIndices;
-  final Color dimColor;
+  final Color? _dimColor;
+
+  /// The explicit color, or the theme's border color (it is not a
+  /// constant, so it cannot be a default parameter value).
+  Color get dimColor => _dimColor ?? AppColors.border;
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +59,14 @@ class _TrendChartPainter extends CustomPainter {
     required this.values,
     required this.highlightedIndices,
     required this.dimColor,
-  });
+  }) : brightness = AppPalette.current.brightness;
 
   final List<double> values;
   final Set<int> highlightedIndices;
   final Color dimColor;
+
+  /// The palette this was built for (colors are read while painting).
+  final Brightness brightness;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -99,6 +107,7 @@ class _TrendChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
     return !listEquals(oldDelegate.values, values) ||
         !setEquals(oldDelegate.highlightedIndices, highlightedIndices) ||
-        oldDelegate.dimColor != dimColor;
+        oldDelegate.dimColor != dimColor ||
+        oldDelegate.brightness != brightness;
   }
 }

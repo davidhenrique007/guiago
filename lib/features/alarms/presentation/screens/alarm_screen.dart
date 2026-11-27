@@ -186,7 +186,7 @@ class _AlarmRing extends StatelessWidget {
         ),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.notifications_none_rounded,
         size: 40,
         color: AppColors.accent,

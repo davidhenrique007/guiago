@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// The twelve months of a year, with previous/next year buttons. A
 /// month that has tasks shows how many; the current month is outlined.
@@ -27,14 +27,10 @@ class CalendarYearGrid extends StatelessWidget {
   final VoidCallback onPreviousYear;
   final VoidCallback onNextYear;
 
-  static String _monthName(int month) {
-    final String name = PtDateLabels.months[month - 1];
-    return '${name[0].toUpperCase()}${name.substring(1)}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final DateTime now = DateTime.now();
+    final AppLocalizations l10n = context.l10n;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -43,18 +39,18 @@ class CalendarYearGrid extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             IconButton(
-              tooltip: 'Ano anterior',
+              tooltip: l10n.previousYear,
               onPressed: onPreviousYear,
-              icon: const Icon(
+              icon: Icon(
                 Icons.chevron_left,
                 color: AppColors.textPrimary,
               ),
             ),
             Text('$year', style: AppTypography.titleMedium),
             IconButton(
-              tooltip: 'Ano seguinte',
+              tooltip: l10n.nextYear,
               onPressed: onNextYear,
-              icon: const Icon(
+              icon: Icon(
                 Icons.chevron_right,
                 color: AppColors.textPrimary,
               ),
@@ -72,7 +68,7 @@ class CalendarYearGrid extends StatelessWidget {
           children: <Widget>[
             for (int month = 1; month <= 12; month++)
               _MonthTile(
-                name: _monthName(month),
+                name: l10n.monthName(month),
                 count: taskCountByMonth[month] ?? 0,
                 isCurrent: year == now.year && month == now.month,
                 onTap: () => onMonthSelected(DateTime(year, month)),
@@ -99,10 +95,11 @@ class _MonthTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
     final bool hasTasks = count > 0;
     return Semantics(
       button: true,
-      label: hasTasks ? '$name, $count tarefas' : name,
+      label: hasTasks ? '$name, ${l10n.taskCount(count)}' : name,
       excludeSemantics: true,
       child: GestureDetector(
         onTap: onTap,
@@ -128,14 +125,14 @@ class _MonthTile extends StatelessWidget {
                     Container(
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: AppColors.primary,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
-                      count == 1 ? '1 tarefa' : '$count tarefas',
+                      l10n.taskCount(count),
                       style: AppTypography.label.copyWith(fontSize: 10),
                     ),
                   ],

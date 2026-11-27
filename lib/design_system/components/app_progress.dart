@@ -27,7 +27,7 @@ class AppProgress extends StatelessWidget {
             value: animatedValue,
             minHeight: 6,
             backgroundColor: AppColors.border,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           );
         },
       ),

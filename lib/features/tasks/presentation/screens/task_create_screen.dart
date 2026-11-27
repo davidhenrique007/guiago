@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../onboarding/application/settings_controller.dart';
+import '../../../onboarding/domain/day_window.dart';
 import '../../../onboarding/domain/settings.dart';
 import '../../../scheduler/data/alarm_permission_providers.dart';
 import '../../../scheduler/data/scheduler_providers.dart';
@@ -54,6 +55,10 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
   TaskPriority _priority = TaskPriority.values.first;
   RecurrenceRule _recurrence = const RecurrenceRule.none();
 
+  /// True while a time suggested from the user's day is still to be
+  /// applied (a future day opened from the Calendar).
+  bool _suggestTime = false;
+
   /// Null = the user has not touched the chip, so the saved default
   /// from [Settings] applies.
   int? _toleranceMinutes;
@@ -80,8 +85,30 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
       final bool isToday = _date.year == today.year &&
           _date.month == today.month &&
           _date.day == today.day;
-      if (!isToday) _time = const TimeOfDay(hour: 9, minute: 0);
+      if (!isToday) {
+        _time = const TimeOfDay(hour: 9, minute: 0);
+        _suggestTime = true;
+      }
     }
+    // The settings may still be loading here, so the suggested time
+    // (09:00, moved inside the user's day) is applied when they arrive,
+    // unless the user has already picked a time.
+    ref.listenManual<AsyncValue<Settings>>(
+      settingsControllerProvider,
+      (AsyncValue<Settings>? previous, AsyncValue<Settings> next) {
+        if (!_suggestTime || next is! AsyncData<Settings>) return;
+        _suggestTime = false;
+        final int minutes = DayWindow.fromSettings(next.value).suggest(9 * 60);
+        final TimeOfDay suggested =
+            TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+        if (previous == null) {
+          _time = suggested; // still inside initState: no rebuild needed
+        } else {
+          setState(() => _time = suggested);
+        }
+      },
+      fireImmediately: true,
+    );
     if (_isEditing) {
       _isLoading = true;
       _loadDraft();
@@ -164,7 +191,9 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
       context: context,
       initialTime: _time,
     );
-    if (picked != null) setState(() => _time = picked);
+    if (picked == null) return;
+    _suggestTime = false;
+    setState(() => _time = picked);
   }
 
   Future<void> _submit() async {
@@ -248,6 +277,7 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
       );
     }
     final Settings settings = _settings(watch: true);
+    final DayWindow dayWindow = DayWindow.fromSettings(settings);
     final int tolerance = _toleranceMinutes ?? settings.defaultToleranceMinutes;
     final int snooze = _snoozeMinutes ?? settings.defaultSnoozeMinutes;
 
@@ -300,6 +330,17 @@ class _TaskCreateScreenState extends ConsumerState<TaskCreateScreen> {
                   ),
                 ],
               ),
+              if (!dayWindow
+                  .contains(_time.hour * 60 + _time.minute)) ...<Widget>[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Fora do teu dia (${dayWindow.label}). '
+                  'Podes guardar na mesma.',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.warning,
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: AppSpacing.lg),
             Text('Prioridade', style: AppTypography.titleMedium),

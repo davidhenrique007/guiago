@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/refresh_task_views.dart';
 import '../../../../app/router/app_router.dart';
-import '../../../../core/utils/pt_date_labels.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../onboarding/application/settings_controller.dart';
+import '../../../onboarding/domain/day_window.dart';
+import '../../../onboarding/domain/settings.dart';
 import '../../application/calendar_controller.dart';
 import '../../application/calendar_month_controller.dart';
 import '../../application/calendar_year_controller.dart';
@@ -132,7 +135,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: Text('Calendário', style: AppTypography.titleLarge),
+        title: Text(
+          context.l10n.calendarTitle,
+          style: AppTypography.titleLarge,
+        ),
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -161,6 +167,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   List<Widget> _body(AsyncValue<CalendarDaySnapshot> snapshotAsync) {
     if (_view == CalendarViewMode.year) return <Widget>[_yearGrid()];
 
+    // The user's day (Perfil). While settings load, no window is shown
+    // or marked rather than guessing one.
+    final AsyncValue<Settings> settingsAsync =
+        ref.watch(settingsControllerProvider);
+    final DayWindow? dayWindow = switch (settingsAsync) {
+      AsyncData<Settings>(:final value) => DayWindow.fromSettings(value),
+      _ => null,
+    };
+
     return <Widget>[
       if (_view == CalendarViewMode.day) ...<Widget>[
         CalendarWeekStrip(
@@ -173,18 +188,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           onPrevious: () => _shiftDay(-1),
           onNext: () => _shiftDay(1),
         ),
+        if (dayWindow != null)
+          Text(
+            context.l10n.yourDay(dayWindow.label),
+            textAlign: TextAlign.center,
+            style: AppTypography.label,
+          ),
       ] else ...<Widget>[
         _monthGrid(),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          PtDateLabels.longDate(_selectedDay),
+          context.l10n.longDate(_selectedDay),
           style: AppTypography.bodyMedium,
         ),
       ],
       const SizedBox(height: AppSpacing.md),
       if (_canCreateForSelectedDay) ...<Widget>[
         AppButton(
-          label: 'Nova tarefa',
+          label: context.l10n.newTask,
           icon: Icons.add,
           onPressed: _createTask,
         ),
@@ -198,12 +219,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             children: <Widget>[
               if (value.items.isNotEmpty) ...<Widget>[
                 Text(
-                  'Tarefas do dia (${value.items.length})',
+                  context.l10n.dayTasks(value.items.length),
                   style: AppTypography.titleMedium,
                 ),
                 const SizedBox(height: AppSpacing.sm),
               ],
               CalendarDayList(
+                dayWindow: dayWindow,
                 items: value.items,
                 onTap: (CalendarTaskItem item) => TaskDetailSheet.show(
                   context,
@@ -216,7 +238,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         AsyncError<CalendarDaySnapshot>() => Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
             child: AppErrorState(
-              message: 'Não foi possível carregar o calendário.',
+              message: context.l10n.calendarLoadError,
               onRetry: _refresh,
             ),
           ),
@@ -249,7 +271,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         ),
         const SizedBox(height: AppSpacing.lg),
         Text(
-          'Escolhe um mês para ver os dias e planear tarefas.',
+          context.l10n.yearHint,
           textAlign: TextAlign.center,
           style: AppTypography.bodyMedium,
         ),

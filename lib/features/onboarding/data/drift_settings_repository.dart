@@ -48,6 +48,9 @@ class DriftSettingsRepository implements SettingsRepository {
               onboardingCompleted: Value<bool>(settings.onboardingCompleted),
               notificationSound: Value<String>(settings.notificationSound),
               vibrationEnabled: Value<bool>(settings.vibrationEnabled),
+              themeMode: Value<String>(settings.themeMode),
+              languageCode: Value<String>(settings.languageCode),
+              photoPath: Value<String>(settings.photoPath),
             ),
           );
       return const Success<void>(null);
@@ -70,5 +73,8 @@ class DriftSettingsRepository implements SettingsRepository {
         onboardingCompleted: row.onboardingCompleted,
         notificationSound: row.notificationSound,
         vibrationEnabled: row.vibrationEnabled,
+        themeMode: row.themeMode,
+        languageCode: row.languageCode,
+        photoPath: row.photoPath,
       );
 }

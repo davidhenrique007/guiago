@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../design_system/design_system.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations_pt.dart';
 import 'app_router.dart';
 import 'shell_swipe_detector.dart';
 
@@ -13,14 +15,29 @@ class AppShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  /// Order matches the branch order declared in `app_router.dart`.
-  static const List<AppBottomNavItem> items = <AppBottomNavItem>[
-    AppBottomNavItem(label: 'Início', icon: Icons.home_outlined),
-    AppBottomNavItem(label: 'Tarefas', icon: Icons.check_box_outlined),
-    AppBottomNavItem(label: 'Calendário', icon: Icons.calendar_today_outlined),
-    AppBottomNavItem(label: 'Progresso', icon: Icons.bar_chart_rounded),
-    AppBottomNavItem(label: 'Perfil', icon: Icons.person_outline),
-  ];
+  /// The destinations, named in the language of [l10n]. Order matches
+  /// the branch order declared in `app_router.dart`.
+  static List<AppBottomNavItem> itemsFor(AppLocalizations l10n) =>
+      <AppBottomNavItem>[
+        AppBottomNavItem(label: l10n.navHome, icon: Icons.home_outlined),
+        AppBottomNavItem(
+          label: l10n.navTasks,
+          icon: Icons.check_box_outlined,
+        ),
+        AppBottomNavItem(
+          label: l10n.navCalendar,
+          icon: Icons.calendar_today_outlined,
+        ),
+        AppBottomNavItem(
+          label: l10n.navProgress,
+          icon: Icons.bar_chart_rounded,
+        ),
+        AppBottomNavItem(label: l10n.navProfile, icon: Icons.person_outline),
+      ];
+
+  /// The destinations in Portuguese, the reference language.
+  static final List<AppBottomNavItem> items =
+      itemsFor(const AppLocalizationsPt());
 
   /// The root screen of each tab. Swiping between tabs only works on
   /// these: on a nested screen (e.g. Insights) it would throw the user
@@ -49,7 +66,7 @@ class AppShell extends StatelessWidget {
         child: navigationShell,
       ),
       bottomNavigationBar: AppBottomNav(
-        items: items,
+        items: itemsFor(context.l10n),
         currentIndex: navigationShell.currentIndex,
         onSelected: (int index) => navigationShell.goBranch(
           index,
